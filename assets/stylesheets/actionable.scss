@@ -1,0 +1,281 @@
+// User summary stats page - actionable icon color
+.stats-actionable-given,
+.stats-actionable-received {
+  .user-stat .d-icon {
+    color: var(--tertiary) !important;
+  }
+
+  // Higher specificity targeting bullseye icon specifically
+  .user-stat .d-icon-bullseye {
+    color: var(--tertiary) !important;
+  }
+}
+
+// Additional specificity for user summary page
+.user-summary-page {
+  .stats-actionable-given,
+  .stats-actionable-received {
+    .user-stat .d-icon,
+    .user-stat .d-icon-bullseye {
+      color: var(--tertiary) !important;
+    }
+  }
+}
+
+// Actionable button styling with different states
+.post-action-menu__actionable-count,
+.post-action-menu__actionable {
+  // Outline state (not actioned) - default clickable state
+  &.actionable {
+    .d-icon {
+      color: var(--primary-medium) !important;
+    }
+
+    &:hover {
+      background: var(--tertiary-low);
+      .d-icon {
+        color: var(--tertiary);
+      }
+    }
+  }
+
+  // Solid state (actioned by someone else)
+  &.has-actionable {
+    .d-icon {
+      color: var(--primary);
+    }
+
+    .discourse-no-touch & {
+      &:hover {
+        background: var(--primary-low);
+        .d-icon {
+          color: var(--primary-medium);
+          &[disabled] {
+            color: var(--primary-medium);
+          }
+        }
+      }
+    }
+  }
+
+  // Colored solid state (actioned by logged user, within 15 min timeout)
+  &.has-actionable.actionable-by-me {
+    .d-icon {
+      color: var(--tertiary);
+    }
+
+    &:hover {
+      background: var(--tertiary-low);
+      .d-icon {
+        color: var(--tertiary);
+      }
+    }
+  }
+
+  // Disabled state when button is disabled (timeout expired or no permission)
+  &[disabled] {
+    cursor: not-allowed;
+    // Don't change opacity or icon color - just prevent interaction
+
+    &:hover {
+      background: transparent;
+    }
+  }
+}
+
+// Animation for check button
+@keyframes checkBump {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.post-action-menu__actionable.toggle-actionable.check-animation .d-icon {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: checkBump 0.4s ease-in-out !important;
+    transform-origin: center center;
+  }
+}
+
+// Actionable count styling (following like button pattern)
+.post-action-menu__actionable-count {
+  &.my-actionables {
+    color: var(--tertiary);
+  }
+
+  &.regular-actionables {
+    color: var(--primary-medium);
+  }
+}
+
+// Custom bullseye SVG icon styling
+.post-action-menu__actionable .d-icon-bullseye {
+  // Ensure proper sizing and alignment
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+
+  // Ensure the SVG fills properly
+  fill: currentColor;
+
+  // Smooth transitions for color changes
+  transition: fill 0.2s ease-in-out;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Summary page styling for actionable sections
+.most-actionabled-section {
+  .summary-user-list {
+    .d-icon-bullseye {
+      color: var(--tertiary) !important;
+
+      // Add subtle visual enhancement
+      filter: drop-shadow(0 0 1px var(--tertiary-low));
+
+      // Smooth transitions
+      transition:
+        color 0.2s ease,
+        filter 0.2s ease;
+    }
+  }
+
+  // Hover effects for actionable user items
+  .actionabled-by-section,
+  .actionabled-section {
+    .user-summary-user:hover {
+      .d-icon-bullseye {
+        color: var(--tertiary-high) !important;
+        filter: drop-shadow(0 0 2px var(--tertiary));
+      }
+    }
+  }
+}
+
+// .discourse-reactions-actions:not(.can-toggle-reaction) .discourse-reactions-reaction-button .reaction-button,
+// .discourse-reactions-actions:not(.can-toggle-reaction) .discourse-reactions-reaction-button {
+//     cursor: not-allowed;
+// }
+
+.discourse-actionable-button {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  border-radius: var(--d-post-control-border-radius);
+  position: relative; // For absolute positioning of child elements
+
+  &:hover {
+    background-color: var(--primary-low);
+  }
+
+  .actionable-count {
+    padding: 8px 0 8px 10px;
+    font-size: var(--font-up-1);
+    color: var(--primary-low-mid);
+    display: flex;
+    pointer-events: auto; // Enable pointer events so count can be clicked
+    cursor: pointer;
+  }
+}
+
+// Container positioning for floating elements
+.double-button {
+  position: relative;
+}
+
+// Styling for the who-actioned avatar list (floating popup like who-liked)
+.who-actioned {
+  position: absolute;
+  z-index: 1000;
+  background: var(--secondary);
+  border: 1px solid var(--primary-low);
+  border-radius: var(--d-border-radius);
+  box-shadow: var(--shadow-dropdown);
+  padding: 0.5em;
+  margin-top: 0.25em;
+  min-width: 200px;
+  top: 26px;
+  display: none;
+
+  &.--expanded {
+    margin-top: 0.5em;
+    display: block;
+  }
+
+  .small-user-list-content {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25em;
+    justify-content: start;
+  }
+
+  .trigger-user-card {
+    display: inline-block;
+  }
+
+  .list-description {
+    color: var(--primary-medium);
+    font-size: var(--font-down-1);
+    margin-left: 0.5em;
+  }
+}
+
+.discourse-no-touch
+  nav.post-controls
+  .actions
+  .double-button
+  .discourse-actionable-button
+  button.button-count {
+  padding-right: 8px;
+
+  &:hover {
+    background-color: var(--primary-low-mid);
+  }
+}
+
+// Directory table column header icons for actionable columns
+.directory-table__column-header,
+.table-header-toggle {
+  // Color the bullseye icon in actionable columns
+  .d-icon-bullseye {
+    color: var(--tertiary) !important;
+
+    // Add a subtle glow effect for visual emphasis
+    filter: drop-shadow(0 0 2px var(--tertiary-low));
+  }
+
+  // Hover state for actionable column headers
+  &:hover {
+    .d-icon-bullseye {
+      color: var(--tertiary-hover) !important;
+      filter: drop-shadow(0 0 3px var(--tertiary-low));
+    }
+  }
+}
+
+// Alternative selector for more specificity if needed
+.users-directory .directory-table .d-icon-bullseye,
+.responsive-table .d-icon-bullseye {
+  color: var(--tertiary) !important;
+  filter: drop-shadow(0 0 2px var(--tertiary-low));
+
+  // Smooth transitions
+  transition:
+    color 0.2s ease,
+    filter 0.2s ease;
+}

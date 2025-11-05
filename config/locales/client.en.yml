@@ -1,0 +1,32 @@
+en:
+  js:
+    post:
+      controls:
+        actionable: "Mark as actionable"
+        undo_actionable: "Unmark as actionable"
+        has_actioned: "Marked as actionable"
+        actionable_count:
+          one: "%{count} person marked this as actionable"
+          other: "%{count} people marked this as actionable"
+        who_actioned: "Who marked this as actionable"
+      has_actionables_title: "%{count} people marked this as actionable"
+      has_actionables_title_only_you: "You marked this as actionable"
+      has_actionables_title_you: "You and %{count} other people marked this as actionable"
+      sr_post_actionable_count_button:
+        one: "%{count} person marked this as actionable"
+        other: "%{count} people marked this as actionable"
+      actions:
+        people:
+          actionable: "people who marked this as actionable"
+          actionable_capped: "and %{count} others who marked this as actionable"
+      actionable:
+        title: "Mark as Actionable"
+        help: "Mark this post as requiring action"
+        long_form: "marked this as actionable"
+        cant_revoke: "You cannot revoke this action"
+        cant_act: "You cannot mark this post as actionable"
+    actionable:
+      title: "Actionable"
+      description: "Mark posts as requiring action"
+    actionable_received: "Received"
+    actionable_given: "Given"

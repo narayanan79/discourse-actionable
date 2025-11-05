@@ -1,0 +1,24 @@
+plugins:
+  actionable_enabled:
+    type: bool
+    default: true
+    client: true
+    description: "Enable the actionable button feature"
+  
+  actionable_max_per_day:
+    type: integer
+    default: 50
+    client: false
+    description: "Maximum number of actionable actions per user per day"
+  
+  actionable_min_trust_level:
+    type: integer
+    default: 0
+    client: false
+    description: "Minimum trust level required to use actionable button"
+    
+  actionable_show_who_actioned:
+    type: bool
+    default: true
+    client: true
+    description: "Show who marked posts as actionable"

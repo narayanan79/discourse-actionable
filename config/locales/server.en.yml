@@ -1,0 +1,18 @@
+en:
+  site_settings:
+    actionable_enabled: "Enable actionable button"
+    actionable_max_per_day: "Maximum actionable actions per day"
+    actionable_min_trust_level: "Minimum trust level for actionable"
+    actionable_show_who_actioned: "Show who marked posts as actionable"
+
+  post_action_types:
+    actionable: "actionable"
+
+  activerecord:
+    attributes:
+      post_action_type:
+        actionable: "Actionable"
+
+  actionable:
+    errors:
+      timeout: "The Actionable reaction was created too long ago. It can no longer be modified or removed."
