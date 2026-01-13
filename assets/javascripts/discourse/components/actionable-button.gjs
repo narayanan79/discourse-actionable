@@ -13,7 +13,7 @@ import { ajax } from "discourse/lib/ajax";
 import { extractError } from "discourse/lib/ajax-error";
 import discourseLater from "discourse/lib/later";
 import { i18n } from "discourse-i18n";
-import { and, eq } from "truth-helpers";
+import { and, eq, not } from "truth-helpers";
 
 /**
  * Actionable button component for marking posts as actionable/requiring action.
@@ -430,6 +430,8 @@ export default class ActionableButton extends Component {
  * @component ActionableCount
  */
 class ActionableCount extends Component {
+  @service siteSettings;
+
   // No icon in count - only show the number like the like button
 
   /**
@@ -448,6 +450,15 @@ class ActionableCount extends Component {
    */
   get actionableCount() {
     return this.args.actionableCount !== undefined ? this.args.actionableCount : this.args.post.actionable_count;
+  }
+
+  /**
+   * Checks if the "who actioned" feature is enabled.
+   *
+   * @returns {boolean} Whether users can click to see who actioned
+   */
+  get canShowWhoActioned() {
+    return this.siteSettings.actionable_show_who_actioned;
   }
 
   /**
@@ -476,9 +487,15 @@ class ActionableCount extends Component {
 
   /**
    * Handles click on the count to toggle the user list.
+   * Only works if actionable_show_who_actioned setting is enabled.
    */
   @action
   toggleWhoActioned() {
+    // Don't do anything if the setting is disabled
+    if (!this.canShowWhoActioned) {
+      return;
+    }
+
     if (this.args.action) {
       this.args.action();
     }
@@ -493,12 +510,14 @@ class ActionableCount extends Component {
           "button-count"
           "highlight-action"
           (if this.actioned "my-actionables" "regular-actionables")
+          (if (not this.canShowWhoActioned) "who-actioned-disabled")
         }}
         ...attributes
         title={{this.translatedTitle}}
-        {{on "click" this.toggleWhoActioned}}
+        {{(if this.canShowWhoActioned (modifier on "click" this.toggleWhoActioned))}}
         type="button"
         aria-pressed={{@isWhoActionedVisible}}
+        disabled={{not this.canShowWhoActioned}}
       >
         {{this.actionableCount}}
       </button>

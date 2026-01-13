@@ -13,45 +13,8 @@ export default {
       // api.replaceIcon("d-unactioned", "far-square");
       // api.replaceIcon("d-actioned", "check");
 
-      // Add custom CSS classes for different icon states
-      api.onPageChange(() => {
-        const style = document.createElement("style");
-        style.textContent = `
-          /* Unactioned state - outline check square */
-          .d-icon-far-check-square {
-            color: var(--primary-medium);
-          }
-          
-          /* Actioned state - solid check square */  
-          .d-icon-check-square {
-            color: var(--success);
-          }
-          
-          /* Hover states */
-          .actionable:hover .d-icon-far-check-square {
-            color: var(--success);
-          }
-          
-          .has-actionable:hover .d-icon-check-square {
-            color: var(--primary-medium);
-          }
-          
-          /* Disabled state */
-          .toggle-actionable[disabled] .d-icon {
-            color: var(--primary-medium);
-          }
-          
-          /* Animation support */
-          .check-animation .d-icon {
-            transform-origin: center;
-          }
-        `;
-
-        if (!document.querySelector("#actionable-icon-styles")) {
-          style.id = "actionable-icon-styles";
-          document.head.appendChild(style);
-        }
-      });
+      // Note: Icon styles have been moved to actionable.scss
+      // No need for dynamic CSS injection
     });
   },
 };

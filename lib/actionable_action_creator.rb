@@ -57,6 +57,8 @@ class ActionableActionCreator
     actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
     return false unless actionable_type_id
 
+    # Use Discourse's PostActionCreator for robust action creation
+    # This automatically handles UserAction logging and event triggering
     creator = PostActionCreator.new(guardian.user, post, actionable_type_id, silent: true)
 
     result = creator.perform
@@ -68,18 +70,12 @@ class ActionableActionCreator
     ActionableDaily.increment_for(guardian.user.id)
 
     # Invalidate user summary cache to ensure stats show up immediately
-    giver_cache_key = "user_summary:#{guardian.user.id}:#{guardian.user.id}"
-    receiver_cache_key = "user_summary:#{post.user.id}:#{post.user.id}"
-    public_giver_cache_key = "user_summary:#{guardian.user.id}:0"
-    public_receiver_cache_key = "user_summary:#{post.user.id}:0"
+    ActionableCacheHelper.invalidate_user_summary_cache(guardian.user.id, post.user.id)
 
-    Discourse.cache.delete(giver_cache_key)
-    Discourse.cache.delete(receiver_cache_key)
-    Discourse.cache.delete(public_giver_cache_key)
-    Discourse.cache.delete(public_receiver_cache_key)
-
-    # Note: UserAction records are created by the :post_action_created event listener in plugin.rb
-    # to avoid duplication and maintain single source of truth
+    # PostActionCreator handles the PostAction creation and triggers events
+    # UserStat updates are handled by UserActionActionableExtension in plugin.rb
+    # UserAction logging is handled by PostActionCreator for standard types
+    # For custom types, it's handled automatically through the action type registry
 
     true
   rescue => e

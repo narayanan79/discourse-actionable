@@ -4,7 +4,7 @@
 # about: Adds an actionable button next to the like button, allowing users to mark posts as actionable
 # version: 1.0.0
 # authors: Discourse Team
-# url: https://github.com/discourse/discourse-actionable
+# url: https://github.com/narayanan79/discourse-actionable
 # required_version: 3.5.0.beta8-dev
 
 enabled_site_setting :actionable_enabled
@@ -26,6 +26,7 @@ after_initialize do
     get "/actionable/:post_id/who" => "actionable#who_actioned"
   end
 
+  require_relative "lib/actionable_cache_helper.rb"
   require_relative "lib/actionable_daily.rb"
   require_relative "lib/actionable_action_creator.rb"
   require_relative "lib/actionable_action_destroyer.rb"
@@ -37,7 +38,7 @@ after_initialize do
     pat.id = 50
     pat.name_key = "actionable"
     pat.is_flag = false
-    pat.icon = "check"
+    pat.icon = "bullseye"
     pat.position = 3
   end
 
@@ -108,84 +109,27 @@ after_initialize do
     update_column(:actionable_count, count)
   end
 
-  # Event listeners for actionable actions
-  on(:post_action_created) do |post_action, creator|
-    actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
-    if post_action.post_action_type_id == actionable_type_id
+  # Event listeners for actionable actions - only handle MessageBus publishing
+  # User stats and UserAction logging is handled by PostActionCreator and the extension below
+  on(:actionable_created) do |post_action, creator|
+    if post_action && creator
       post = post_action.post
-      post.update_actionable_count
-
-      # Update user stats
-      if creator && post.user
-        creator.user_stat.increment!(:actionable_given)
-        post.user.user_stat.increment!(:actionable_received)
-
-        # Create UserAction records for tracking
-        UserAction.log_action!(
-          action_type: UserAction::ACTIONABLE_GIVEN,
-          user_id: creator.id,
-          acting_user_id: creator.id,
-          target_post_id: post.id,
-          target_topic_id: post.topic_id,
-        )
-
-        UserAction.log_action!(
-          action_type: UserAction::ACTIONABLE_RECEIVED,
-          user_id: post.user.id,
-          acting_user_id: creator.id,
-          target_post_id: post.id,
-          target_topic_id: post.topic_id,
-        )
-      end
-
-      # Publish real-time update using Discourse's standard method (single source of truth)
+      # Publish real-time update using Discourse's standard method
       post.publish_change_to_clients!(
         :actioned,
         { actionable_count: post.actionable_count, actioned_by: creator.id },
       )
-
-      # Trigger plugin event
-      DiscourseEvent.trigger(:actionable_created, post_action, creator)
     end
   end
 
-  on(:post_action_destroyed) do |post_action, destroyer|
-    actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
-    if post_action.post_action_type_id == actionable_type_id
+  on(:actionable_destroyed) do |post_action, destroyer|
+    if post_action && destroyer
       post = post_action.post
-      post.update_actionable_count
-
-      # Update user stats
-      if destroyer && post.user
-        destroyer.user_stat.decrement!(:actionable_given)
-        post.user.user_stat.decrement!(:actionable_received)
-
-        # Remove UserAction records
-        UserAction.remove_action!(
-          action_type: UserAction::ACTIONABLE_GIVEN,
-          user_id: destroyer.id,
-          acting_user_id: destroyer.id,
-          target_post_id: post.id,
-          target_topic_id: post.topic_id,
-        )
-
-        UserAction.remove_action!(
-          action_type: UserAction::ACTIONABLE_RECEIVED,
-          user_id: post.user.id,
-          acting_user_id: destroyer.id,
-          target_post_id: post.id,
-          target_topic_id: post.topic_id,
-        )
-      end
-
-      # Publish real-time update using Discourse's standard method (single source of truth)
+      # Publish real-time update using Discourse's standard method
       post.publish_change_to_clients!(
         :unactioned,
         { actionable_count: post.actionable_count, actioned_by: destroyer.id },
       )
-
-      # Trigger plugin event
-      DiscourseEvent.trigger(:actionable_destroyed, post_action, destroyer)
     end
   end
 
@@ -279,4 +223,10 @@ after_initialize do
         AND di.period_type = :period_type
         AND di.actionable_given <> actionable_stats.actionable_given_count
     SQL
+
+  # Scheduled job to clean up old daily tracking records
+  # Runs once per day at midnight to remove records older than 90 days
+  every :day, at: 0.hours do
+    ActionableDaily.cleanup_old_records(90)
+  end
 end

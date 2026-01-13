@@ -11,33 +11,35 @@ class ActionableDaily < ActiveRecord::Base
 
   def self.increment_for(user_id)
     date = Date.current
-    
-    daily_record = find_or_create_by(
-      user_id: user_id,
-      actionable_date: date
-    ) do |record|
-      record.actionable_count = 0
+
+    # Use atomic SQL update to prevent race conditions
+    result = where(user_id: user_id, actionable_date: date)
+      .update_all("actionable_count = actionable_count + 1")
+
+    # If no record was updated, create one
+    if result == 0
+      begin
+        create!(user_id: user_id, actionable_date: date, actionable_count: 1)
+      rescue ActiveRecord::RecordNotUnique
+        # Another thread created it, retry the update
+        retry
+      end
     end
-    
-    daily_record.increment!(:actionable_count)
-    daily_record
-  rescue ActiveRecord::RecordNotUnique
-    # Handle race condition
-    retry
+
+    # Return the record (optional, for backward compatibility)
+    find_by(user_id: user_id, actionable_date: date)
   end
 
   def self.decrement_for(user_id)
     date = Date.current
-    
-    daily_record = find_by(
-      user_id: user_id,
-      actionable_date: date
-    )
-    
-    return unless daily_record && daily_record.actionable_count > 0
-    
-    daily_record.decrement!(:actionable_count)
-    daily_record
+
+    # Use atomic SQL update with condition to prevent negative counts
+    where(user_id: user_id, actionable_date: date)
+      .where("actionable_count > 0")
+      .update_all("actionable_count = actionable_count - 1")
+
+    # Return the record (optional, for backward compatibility)
+    find_by(user_id: user_id, actionable_date: date)
   end
 
   def self.count_for(user_id, date = Date.current)

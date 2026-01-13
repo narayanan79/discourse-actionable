@@ -45,18 +45,10 @@ class ActionableActionDestroyer
     ActionableDaily.decrement_for(guardian.user.id)
 
     # Invalidate user summary cache to ensure stats show up immediately
-    giver_cache_key = "user_summary:#{guardian.user.id}:#{guardian.user.id}"
-    receiver_cache_key = "user_summary:#{post.user.id}:#{post.user.id}"
-    public_giver_cache_key = "user_summary:#{guardian.user.id}:0"
-    public_receiver_cache_key = "user_summary:#{post.user.id}:0"
+    ActionableCacheHelper.invalidate_user_summary_cache(guardian.user.id, post.user.id)
 
-    Discourse.cache.delete(giver_cache_key)
-    Discourse.cache.delete(receiver_cache_key)
-    Discourse.cache.delete(public_giver_cache_key)
-    Discourse.cache.delete(public_receiver_cache_key)
-
-    # Note: UserAction records are removed by the :post_action_destroyed event listener in plugin.rb
-    # to avoid duplication and maintain single source of truth
+    # Note: UserAction records and UserStat updates are handled automatically by
+    # remove_act! which triggers core events and our UserActionActionableExtension
 
     true
   rescue => e
