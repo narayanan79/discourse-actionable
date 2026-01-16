@@ -14,7 +14,7 @@ export default class ActionableActivityLinks extends Component {
         @ariaCurrentContext="subNav"
         class="user-nav__activity-actionable-given"
       >
-        {{icon "tasks"}}
+        {{icon "bullseye"}}
         <span>{{i18n "user_action_groups.18"}}</span>
       </DNavigationItem>
       <DNavigationItem
@@ -22,7 +22,7 @@ export default class ActionableActivityLinks extends Component {
         @ariaCurrentContext="subNav"
         class="user-nav__activity-actionable-received"
       >
-        {{icon "inbox"}}
+        {{icon "bullseye"}}
         <span>{{i18n "user_action_groups.19"}}</span>
       </DNavigationItem>
     {{/if}}

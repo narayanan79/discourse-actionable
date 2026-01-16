@@ -17,7 +17,7 @@ export default class UserActivityActionableGiven extends UserActivityStreamRoute
         });
     const body = htmlSafe(
       i18n("user_activity.no_actionable_given_body", {
-        icon: iconHTML("tasks"),
+        icon: iconHTML("bullseye"),
       })
     );
 

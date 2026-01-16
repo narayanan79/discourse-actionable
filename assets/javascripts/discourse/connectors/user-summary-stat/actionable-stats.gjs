@@ -15,7 +15,7 @@ export default class ActionableStats extends Component {
             <UserStat
               @value={{@outletArgs.model.actionable_given}}
               @label="user.summary.actionable_given.other"
-              @icon="tasks"
+              @icon="bullseye"
             />
           </LinkTo>
         </li>
@@ -26,7 +26,7 @@ export default class ActionableStats extends Component {
             <UserStat
               @value={{@outletArgs.model.actionable_received}}
               @label="user.summary.actionable_received.other"
-              @icon="inbox"
+              @icon="bullseye"
             />
           </LinkTo>
         </li>

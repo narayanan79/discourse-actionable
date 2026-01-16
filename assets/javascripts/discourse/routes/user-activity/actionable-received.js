@@ -17,7 +17,7 @@ export default class UserActivityActionableReceived extends UserActivityStreamRo
         });
     const body = htmlSafe(
       i18n("user_activity.no_actionable_received_body", {
-        icon: iconHTML("inbox"),
+        icon: iconHTML("bullseye"),
       })
     );
 
