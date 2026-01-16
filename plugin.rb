@@ -30,6 +30,12 @@ after_initialize do
   require_relative "lib/actionable_daily.rb"
   require_relative "lib/actionable_action_creator.rb"
   require_relative "lib/actionable_action_destroyer.rb"
+  require_relative "lib/user_summary_extension.rb"
+
+  # Extend UserSummary to add actionable stats
+  reloadable_patch do |plugin|
+    ::UserSummary.prepend(DiscourseActionable::UserSummaryExtension)
+  end
 
   # Add UserAction constants for actionable actions
   reloadable_patch do |plugin|
