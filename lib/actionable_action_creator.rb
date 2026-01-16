@@ -72,10 +72,23 @@ class ActionableActionCreator
     # Invalidate user summary cache to ensure stats show up immediately
     ActionableCacheHelper.invalidate_user_summary_cache(guardian.user.id, post.user.id)
 
-    # PostActionCreator handles the PostAction creation and triggers events
-    # UserStat updates are handled by UserActionActionableExtension in plugin.rb
-    # UserAction logging is handled by PostActionCreator for standard types
-    # For custom types, it's handled automatically through the action type registry
+    # Create UserAction records for both the giver and receiver
+    # This is necessary for custom action types as PostActionCreator doesn't do this automatically
+    UserAction.log_action!(
+      action_type: UserAction::ACTIONABLE_GIVEN,
+      user_id: guardian.user.id,
+      acting_user_id: guardian.user.id,
+      target_post_id: post.id,
+      target_topic_id: post.topic_id,
+    )
+
+    UserAction.log_action!(
+      action_type: UserAction::ACTIONABLE_RECEIVED,
+      user_id: post.user.id,
+      acting_user_id: guardian.user.id,
+      target_post_id: post.id,
+      target_topic_id: post.topic_id,
+    )
 
     true
   rescue => e

@@ -1,5 +1,18 @@
 en:
   js:
+    user_action_groups:
+      "18": "Actionable Given"
+      "19": "Actionable Received"
+
+    user:
+      summary:
+        actionable_given:
+          one: "actionable given"
+          other: "actionable given"
+        actionable_received:
+          one: "actionable received"
+          other: "actionable received"
+
     post:
       controls:
         actionable: "Mark as actionable"
