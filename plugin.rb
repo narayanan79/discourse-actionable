@@ -231,8 +231,9 @@ after_initialize do
     SQL
 
   # Scheduled job to clean up old daily tracking records
-  # Runs once per day at midnight to remove records older than 90 days
-  every :day, at: 0.hours do
-    ActionableDaily.cleanup_old_records(90)
-  end
+  # TODO: Convert to proper Job class for Discourse 2026+
+  # NOTE: The `every` API was removed. Need to create app/jobs/scheduled/cleanup_actionable_daily.rb
+  # every :day, at: 0.hours do
+  #   ActionableDaily.cleanup_old_records(90)
+  # end
 end
