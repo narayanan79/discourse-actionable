@@ -236,4 +236,8 @@ after_initialize do
   # every :day, at: 0.hours do
   #   ActionableDaily.cleanup_old_records(90)
   # end
+
+  # Add user stats to serializers
+  add_to_serializer(:user_summary, :actionable_given) { object.actionable_given }
+  add_to_serializer(:user_summary, :actionable_received) { object.actionable_received }
 end
