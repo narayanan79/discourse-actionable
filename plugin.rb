@@ -31,6 +31,12 @@ after_initialize do
   require_relative "lib/actionable_action_creator.rb"
   require_relative "lib/actionable_action_destroyer.rb"
 
+  # Add UserAction constants for actionable actions
+  reloadable_patch do |plugin|
+    UserAction::ACTIONABLE_GIVEN = 18 unless UserAction.const_defined?(:ACTIONABLE_GIVEN)
+    UserAction::ACTIONABLE_RECEIVED = 19 unless UserAction.const_defined?(:ACTIONABLE_RECEIVED)
+  end
+
   # Add post action type for actionable using reloadable_patch
   reloadable_patch { |plugin| PostActionType.types[:actionable] = 50 }
 
