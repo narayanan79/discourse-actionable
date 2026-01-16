@@ -1,0 +1,5 @@
+# Discourse Compatibility File
+# Supports Discourse 3.5 ESR and all 2025-2026 releases
+# Uses modern Glimmer components and Plugin API 1.34.0+
+
+>= 3.5.0
