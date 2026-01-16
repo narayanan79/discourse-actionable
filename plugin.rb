@@ -14,6 +14,8 @@ register_asset "stylesheets/actionable.scss"
 
 # Register custom SVG icons
 register_svg_icon "bullseye"
+register_svg_icon "tasks"
+register_svg_icon "inbox"
 
 after_initialize do
   # Require controller
