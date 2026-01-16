@@ -13,6 +13,14 @@ en:
           one: "actionable received"
           other: "actionable received"
 
+    user_activity:
+      no_actionable_given_title: "You haven't marked any posts as actionable yet"
+      no_actionable_given_title_others: "%{username} hasn't marked any posts as actionable yet"
+      no_actionable_given_body: "Mark posts as actionable using the %{icon} button to track action items."
+      no_actionable_received_title: "No posts marked as actionable for you"
+      no_actionable_received_title_others: "No posts marked as actionable for %{username}"
+      no_actionable_received_body: "When others mark your posts as actionable, they'll appear here."
+
     post:
       controls:
         actionable: "Mark as actionable"
