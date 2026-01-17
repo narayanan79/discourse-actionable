@@ -35,14 +35,14 @@ after_initialize do
   require_relative "lib/user_summary_extension.rb"
 
   # Extend UserSummary to add actionable stats
-  reloadable_patch do |plugin|
-    ::UserSummary.prepend(DiscourseActionable::UserSummaryExtension)
-  end
+  reloadable_patch { |plugin| ::UserSummary.prepend(DiscourseActionable::UserSummaryExtension) }
 
   # Add UserAction constants for actionable actions
   reloadable_patch do |plugin|
+    # rubocop:disable Discourse/Plugins/NamespaceConstants
     UserAction::ACTIONABLE_GIVEN = 18 unless UserAction.const_defined?(:ACTIONABLE_GIVEN)
     UserAction::ACTIONABLE_RECEIVED = 19 unless UserAction.const_defined?(:ACTIONABLE_RECEIVED)
+    # rubocop:enable Discourse/Plugins/NamespaceConstants
   end
 
   # Add post action type for actionable using reloadable_patch
@@ -254,9 +254,7 @@ after_initialize do
     object.most_actionabled_by_users
   end
 
-  add_to_serializer(:user_summary, :most_actionabled_users, false) do
-    object.most_actionabled_users
-  end
+  add_to_serializer(:user_summary, :most_actionabled_users, false) { object.most_actionabled_users }
 
   add_to_serializer(:user_summary, :include_most_actionabled_by_users?) do
     SiteSetting.actionable_enabled && object.most_actionabled_by_users.present?

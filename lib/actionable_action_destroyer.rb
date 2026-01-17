@@ -48,22 +48,18 @@ class ActionableActionDestroyer
     ActionableCacheHelper.invalidate_user_summary_cache(guardian.user.id, post.user.id)
 
     # Remove UserAction records for both the giver and receiver
-    UserAction
-      .where(
-        action_type: UserAction::ACTIONABLE_GIVEN,
-        user_id: guardian.user.id,
-        target_post_id: post.id,
-      )
-      .destroy_all
+    UserAction.where(
+      action_type: UserAction::ACTIONABLE_GIVEN,
+      user_id: guardian.user.id,
+      target_post_id: post.id,
+    ).destroy_all
 
-    UserAction
-      .where(
-        action_type: UserAction::ACTIONABLE_RECEIVED,
-        user_id: post.user.id,
-        target_post_id: post.id,
-        acting_user_id: guardian.user.id,
-      )
-      .destroy_all
+    UserAction.where(
+      action_type: UserAction::ACTIONABLE_RECEIVED,
+      user_id: post.user.id,
+      target_post_id: post.id,
+      acting_user_id: guardian.user.id,
+    ).destroy_all
 
     true
   rescue => e

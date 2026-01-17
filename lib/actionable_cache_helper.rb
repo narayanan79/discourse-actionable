@@ -6,8 +6,8 @@ module ActionableCacheHelper
   # viewer_id = 0 means public view, otherwise it's a specific user viewing
   def self.user_summary_cache_keys(user_id)
     [
-      "user_summary:#{user_id}:#{user_id}",  # User viewing their own summary
-      "user_summary:#{user_id}:0"            # Public view of the summary
+      "user_summary:#{user_id}:#{user_id}", # User viewing their own summary
+      "user_summary:#{user_id}:0", # Public view of the summary
     ]
   end
 
