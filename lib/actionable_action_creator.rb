@@ -71,6 +71,7 @@ class ActionableActionCreator
 
     # Create UserAction records for both the giver and receiver
     # This is necessary for custom action types as PostActionCreator doesn't do this automatically
+    # Note: log_action! calls update_like_count internally, which uses UserActionActionableExtension
     UserAction.log_action!(
       action_type: UserAction::ACTIONABLE_GIVEN,
       user_id: guardian.user.id,
@@ -86,12 +87,6 @@ class ActionableActionCreator
       target_post_id: post.id,
       target_topic_id: post.topic_id,
     )
-
-    # Update user stats counters
-    # Discourse's log_action! does not call update_like_count, so we must do it manually
-    # Our UserActionActionableExtension handles the custom action types
-    UserAction.update_like_count(guardian.user.id, UserAction::ACTIONABLE_GIVEN, 1)
-    UserAction.update_like_count(post.user.id, UserAction::ACTIONABLE_RECEIVED, 1)
 
     # Invalidate user summary cache AFTER stats are updated to ensure fresh data
     ActionableCacheHelper.invalidate_user_summary_cache(guardian.user.id, post.user.id)
