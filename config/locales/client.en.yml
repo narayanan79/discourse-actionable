@@ -6,12 +6,8 @@ en:
 
     user:
       summary:
-        actionable_given:
-          one: "actionable given"
-          other: "actionable given"
-        actionable_received:
-          one: "actionable received"
-          other: "actionable received"
+        actionable_given: "Actionable Given"
+        actionable_received: "Actionable Received"
         most_actionabled_by: "Most Actionabled By"
         most_actionabled_users: "Most Actionabled Users"
         no_actionables: "No actionables yet"
