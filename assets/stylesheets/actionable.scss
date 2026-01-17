@@ -150,6 +150,12 @@
   }
 }
 
+// Enable flexbox on the parent container for ordering
+.user-summary {
+  display: flex;
+  flex-direction: column;
+}
+
 // Summary page styling for actionable sections
 .most-actionabled-section {
   // Order after Most Liked sections (which have order: 1)
