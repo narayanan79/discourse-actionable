@@ -250,17 +250,20 @@ after_initialize do
   add_to_serializer(:user_summary, :actionable_received) { object.actionable_received }
 
   # Add user summary section data
-  add_to_serializer(:user_summary, :most_actionabled_by_users, false) do
-    object.most_actionabled_by_users
-  end
+  # Use has_many with UserWithCountSerializer to properly serialize the user objects
+  reloadable_patch do |plugin|
+    ::UserSummarySerializer.class_eval do
+      has_many :most_actionabled_by_users, serializer: UserWithCountSerializer, embed: :object
 
-  add_to_serializer(:user_summary, :most_actionabled_users, false) { object.most_actionabled_users }
+      has_many :most_actionabled_users, serializer: UserWithCountSerializer, embed: :object
 
-  add_to_serializer(:user_summary, :include_most_actionabled_by_users?) do
-    SiteSetting.actionable_enabled && object.most_actionabled_by_users.present?
-  end
+      def include_most_actionabled_by_users?
+        SiteSetting.actionable_enabled && object.most_actionabled_by_users.present?
+      end
 
-  add_to_serializer(:user_summary, :include_most_actionabled_users?) do
-    SiteSetting.actionable_enabled && object.most_actionabled_users.present?
+      def include_most_actionabled_users?
+        SiteSetting.actionable_enabled && object.most_actionabled_users.present?
+      end
+    end
   end
 end
