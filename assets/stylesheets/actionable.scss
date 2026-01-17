@@ -152,6 +152,9 @@
 
 // Summary page styling for actionable sections
 .most-actionabled-section {
+  // Order after Most Liked sections (which have order: 1)
+  order: 2;
+
   .summary-user-list {
     .d-icon-bullseye {
       color: var(--tertiary) !important;

@@ -8,8 +8,8 @@ en:
       summary:
         actionable_given: "Actionable Given"
         actionable_received: "Actionable Received"
-        most_actionabled_by: "Most Actionabled By"
-        most_actionabled_users: "Most Actionabled Users"
+        most_actionabled_by: "Most Actionable Received From"
+        most_actionabled_users: "Most Actionable Given To"
         no_actionables: "No actionables yet"
 
     user_activity:
