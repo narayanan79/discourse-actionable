@@ -69,9 +69,6 @@ class ActionableActionCreator
     # Track daily action
     ActionableDaily.increment_for(guardian.user.id)
 
-    # Invalidate user summary cache to ensure stats show up immediately
-    ActionableCacheHelper.invalidate_user_summary_cache(guardian.user.id, post.user.id)
-
     # Create UserAction records for both the giver and receiver
     # This is necessary for custom action types as PostActionCreator doesn't do this automatically
     # Note: log_action! automatically calls update_like_count to update user_stats
@@ -90,6 +87,9 @@ class ActionableActionCreator
       target_post_id: post.id,
       target_topic_id: post.topic_id,
     )
+
+    # Invalidate user summary cache AFTER stats are updated to ensure fresh data
+    ActionableCacheHelper.invalidate_user_summary_cache(guardian.user.id, post.user.id)
 
     true
   rescue => e
