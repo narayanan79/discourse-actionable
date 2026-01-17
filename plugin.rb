@@ -248,4 +248,21 @@ after_initialize do
   # Add user stats to serializers
   add_to_serializer(:user_summary, :actionable_given) { object.actionable_given }
   add_to_serializer(:user_summary, :actionable_received) { object.actionable_received }
+
+  # Add user summary section data
+  add_to_serializer(:user_summary, :most_actionabled_by_users, false) do
+    object.most_actionabled_by_users
+  end
+
+  add_to_serializer(:user_summary, :most_actionabled_users, false) do
+    object.most_actionabled_users
+  end
+
+  add_to_serializer(:user_summary, :include_most_actionabled_by_users?) do
+    SiteSetting.actionable_enabled && object.most_actionabled_by_users.present?
+  end
+
+  add_to_serializer(:user_summary, :include_most_actionabled_users?) do
+    SiteSetting.actionable_enabled && object.most_actionabled_users.present?
+  end
 end
