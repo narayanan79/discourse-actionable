@@ -61,6 +61,10 @@ class ActionableActionDestroyer
       acting_user_id: guardian.user.id,
     ).destroy_all
 
+    # Update user stats counters (decrement)
+    UserAction.update_like_count(guardian.user.id, UserAction::ACTIONABLE_GIVEN, -1)
+    UserAction.update_like_count(post.user.id, UserAction::ACTIONABLE_RECEIVED, -1)
+
     true
   rescue => e
     Rails.logger.error("Failed to destroy actionable action: #{e.message}")

@@ -90,6 +90,10 @@ class ActionableActionCreator
       target_topic_id: post.topic_id,
     )
 
+    # Update user stats counters
+    UserAction.update_like_count(guardian.user.id, UserAction::ACTIONABLE_GIVEN, 1)
+    UserAction.update_like_count(post.user.id, UserAction::ACTIONABLE_RECEIVED, 1)
+
     true
   rescue => e
     Rails.logger.error("Failed to create actionable action: #{e.message}")
