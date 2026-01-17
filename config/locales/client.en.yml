@@ -12,6 +12,9 @@ en:
         actionable_received:
           one: "actionable received"
           other: "actionable received"
+        most_actionabled_by: "Most Actionabled By"
+        most_actionabled_users: "Most Actionabled Users"
+        no_actionables: "No actionables yet"
 
     user_activity:
       no_actionable_given_title: "You haven't marked any posts as actionable yet"
