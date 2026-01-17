@@ -1,19 +1,19 @@
 # frozen_string_literal: true
 
 module ActionableCacheHelper
-  # Generates cache keys for user summary pages
-  # Discourse caches user summaries with format: "user_summary:{user_id}:{viewer_id}"
-  # viewer_id = 0 means public view, otherwise it's a specific user viewing
-  def self.user_summary_cache_keys(user_id)
-    [
-      "user_summary:#{user_id}:#{user_id}", # User viewing their own summary
-      "user_summary:#{user_id}:0", # Public view of the summary
-    ]
-  end
-
   # Invalidates user summary cache for both giver and receiver
+  # Must clear UserSummary instances which internally manage their own caching
   def self.invalidate_user_summary_cache(giver_id, receiver_id)
-    keys = user_summary_cache_keys(giver_id) + user_summary_cache_keys(receiver_id)
-    keys.each { |key| Discourse.cache.delete(key) }
+    # Clear for all possible viewer_id combinations and locales
+    [giver_id, receiver_id].each do |user_id|
+      [user_id, 0].each do |viewer_id|
+        # Discourse caches with locale suffix, so we need to clear all locales
+        I18n.available_locales.each do |locale|
+          Discourse.cache.delete("user_summary:#{user_id}:#{viewer_id}:#{locale}")
+        end
+        # Also clear without locale for older cache entries
+        Discourse.cache.delete("user_summary:#{user_id}:#{viewer_id}")
+      end
+    end
   end
 end
