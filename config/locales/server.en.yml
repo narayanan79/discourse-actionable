@@ -6,10 +6,7 @@ en:
     actionable_show_who_actioned: "Show who marked posts as actionable"
 
   post_action_types:
-    actionable:
-      title: "Actionable"
-      description: "Mark this post as actionable"
-      short_description: "Mark as actionable"
+    actionable: "actionable"
 
   activerecord:
     attributes:
