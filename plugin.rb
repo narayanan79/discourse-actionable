@@ -148,17 +148,15 @@ after_initialize do
   end
 
   # Listen to like events to invalidate user summary cache with locale support
-  on(:like_created) do |post_action, liker|
-    if post_action && liker
-      post = post_action.post
-      ActionableCacheHelper.invalidate_user_summary_cache(liker.id, post.user_id)
+  on(:like_created) do |post_action|
+    if post_action
+      ActionableCacheHelper.invalidate_user_summary_cache(post_action.user_id, post_action.post&.user_id)
     end
   end
 
-  on(:like_destroyed) do |post_action, user|
-    if post_action && user
-      post = post_action.post
-      ActionableCacheHelper.invalidate_user_summary_cache(user.id, post.user_id)
+  on(:like_destroyed) do |post_action|
+    if post_action
+      ActionableCacheHelper.invalidate_user_summary_cache(post_action.user_id, post_action.post&.user_id)
     end
   end
 
