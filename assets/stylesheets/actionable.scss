@@ -301,3 +301,15 @@
     color 0.2s ease,
     filter 0.2s ease;
 }
+
+// For positioning the sections on the user profile page
+.user-main .user-content {
+  display: flex;
+  flex-direction: column;
+}
+.top-section.top-categories-section {
+  order: 4
+}
+.top-section.badges-section {
+  order: 5
+}
