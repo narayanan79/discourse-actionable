@@ -48,12 +48,21 @@ after_initialize do
   # Add post action type for actionable using reloadable_patch
   reloadable_patch { |plugin| PostActionType.types[:actionable] = 50 }
 
-  PostActionType.seed do |pat|
-    pat.id = 50
-    pat.name_key = "actionable"
-    pat.is_flag = false
-    pat.icon = "bullseye"
-    pat.position = 3
+  # Seed the DB record only on a real boot. During `assets:precompile` Discourse
+  # runs with `GlobalSetting.skip_redis?` true, so `Discourse.cache` is a bare
+  # ActiveSupport::Cache::MemoryStore. Saving a PostActionType fires core's
+  # `after_save { expire_cache }` callback, which (as of 2026.7.0) calls
+  # `Discourse.cache.redis.del(...)` — and MemoryStore has no #redis, so it
+  # raises NoMethodError and aborts the rebuild. The record is created by the
+  # db/migrate migration, so skipping the seed here is safe.
+  unless GlobalSetting.skip_redis?
+    PostActionType.seed do |pat|
+      pat.id = 50
+      pat.name_key = "actionable"
+      pat.is_flag = false
+      pat.icon = "bullseye"
+      pat.position = 3
+    end
   end
 
   # Add actionable action summary (following like button pattern)
