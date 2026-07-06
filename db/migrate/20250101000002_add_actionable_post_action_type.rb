@@ -8,7 +8,7 @@ class AddActionablePostActionType < ActiveRecord::Migration[7.0]
         id: 50,
         name_key: 'actionable',
         is_flag: false,
-        icon: 'check',
+        icon: 'bullseye',
         position: 3
       )
     end
