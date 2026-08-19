@@ -3,7 +3,7 @@
 # name: discourse-actionable
 # about: Adds an actionable button next to the like button, allowing users to mark posts as actionable
 # version: 1.0.0
-# authors: Discourse Team
+# authors: narayanan79
 # url: https://github.com/narayanan79/discourse-actionable
 # required_version: 3.5
 
