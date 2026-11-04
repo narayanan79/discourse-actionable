@@ -1,136 +1,114 @@
 # frozen_string_literal: true
 
 class ActionableController < ApplicationController
+  WHO_ACTIONED_LIMIT = 50
+
+  requires_plugin DiscourseActionable::PLUGIN_NAME
   requires_login
-  before_action :ensure_actionable_enabled
+
+  before_action :ensure_daily_limit_not_reached, only: :create
 
   def create
     ActionableActionCreator.call(service_params) do
       on_success do |post:|
-        # Reload to get fresh serializer data
-        post.reload
-        serializer = PostSerializer.new(post, scope: guardian, root: false)
-
-        render json: {
-                 success: true,
-                 actionable_count: post.actionable_count || 0,
-                 acted: true,
-                 actioned: serializer.actioned,
-                 can_toggle_actionable: serializer.can_toggle_actionable,
-               }
+        # Only successful marks count towards the daily limit.
+        daily_rate_limiter.performed!(raise_error: false)
+        render_toggle_result(post)
       end
-
-      on_failure do
-        render json: {
-                 success: false,
-                 errors: ["Failed to mark as actionable"],
-               },
-               status: :unprocessable_entity
-      end
-
-      on_failed_policy(:can_create_actionable) do |policy|
-        render json: {
-                 success: false,
-                 errors: ["Not allowed to mark as actionable"],
-               },
-               status: :forbidden
-      end
-
-      on_failed_policy(:within_rate_limit) do |policy|
-        render json: { success: false, errors: ["Rate limit exceeded"] }, status: :too_many_requests
-      end
-
-      on_model_not_found(:post) do
-        render json: { success: false, errors: ["Post not found"] }, status: :not_found
-      end
-
       on_failed_contract do |contract|
-        render json: { success: false, errors: contract.errors.full_messages }, status: :bad_request
+        render_errors(contract.errors.full_messages, status: :bad_request)
       end
+      on_model_not_found(:post) { render_error(:post_not_found, status: :not_found) }
+      on_failed_policy(:can_mark_post_actionable) { render_error(:not_allowed, status: :forbidden) }
+      on_failed_policy(:not_already_actioned) do
+        render_error(:already_actioned, status: :unprocessable_entity)
+      end
+      on_lock_not_acquired(:post_id) { raise Discourse::ReadOnly }
+      on_failure { render_error(:create_failed, status: :unprocessable_entity) }
     end
   end
 
   def destroy
     ActionableActionDestroyer.call(service_params) do
-      on_success do |post:|
-        # Reload to get fresh serializer data
-        post.reload
-        serializer = PostSerializer.new(post, scope: guardian, root: false)
-
-        render json: {
-                 success: true,
-                 actionable_count: post.actionable_count || 0,
-                 acted: false,
-                 actioned: serializer.actioned,
-                 can_toggle_actionable: serializer.can_toggle_actionable,
-               }
-      end
-
-      on_failure do
-        render json: {
-                 success: false,
-                 errors: ["Failed to unmark as actionable"],
-               },
-               status: :unprocessable_entity
-      end
-
-      on_failed_policy(:can_remove_action) do |policy|
-        render json: {
-                 success: false,
-                 errors: [
-                   "The Actionable reaction was created too long ago. It can no longer be modified or removed.",
-                 ],
-               },
-               status: :forbidden
-      end
-
-      on_model_not_found(:post) do
-        render json: { success: false, errors: ["Post not found"] }, status: :not_found
-      end
-
+      on_success { |post:| render_toggle_result(post) }
       on_failed_contract do |contract|
-        render json: { success: false, errors: contract.errors.full_messages }, status: :bad_request
+        render_errors(contract.errors.full_messages, status: :bad_request)
       end
+      on_model_not_found(:post) { render_error(:post_not_found, status: :not_found) }
+      on_model_not_found(:post_action) { render_error(:not_actioned, status: :not_found) }
+      on_failed_policy(:can_remove_post_action) { render_error(:timeout, status: :forbidden) }
+      on_lock_not_acquired(:post_id) { raise Discourse::ReadOnly }
+      on_failure { render_error(:destroy_failed, status: :unprocessable_entity) }
     end
   end
 
   def who_actioned
-    params.require(:post_id)
-
-    post = Post.find(params[:post_id])
+    post = Post.find_by(id: params[:post_id])
+    raise Discourse::NotFound if post.blank?
     guardian.ensure_can_see!(post)
+    raise Discourse::InvalidAccess if !SiteSetting.actionable_show_who_actioned
 
-    raise Discourse::InvalidAccess unless SiteSetting.actionable_show_who_actioned
+    type_id = DiscourseActionable::POST_ACTION_TYPE_ID
+    post_actions = PostAction.where(post_id: post.id, post_action_type_id: type_id)
+    # Same rule as core's "who liked" list: hide users the viewer ignores.
+    post_actions = post_actions.where(<<~SQL, current_user_id: current_user.id)
+      NOT EXISTS (
+        SELECT 1 FROM ignored_users ig
+        WHERE ig.user_id = :current_user_id
+          AND ig.ignored_user_id = post_actions.user_id
+          AND ig.ignored_user_id <> :current_user_id
+      )
+    SQL
 
-    actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
-    actions =
-      PostAction
-        .includes(:user)
-        .where(post: post, post_action_type_id: actionable_type_id)
-        .where(deleted_at: nil)
-        .limit(50)
+    total_count = post_actions.count
+    ordered = post_actions.includes(:user).order(:created_at, :id)
+    users = ordered.limit(WHO_ACTIONED_LIMIT).filter_map(&:user)
 
-    users = actions.map(&:user).compact.uniq
-
-    render json: {
-             users:
-               ActiveModel::ArraySerializer.new(
-                 users,
-                 each_serializer: BasicUserSerializer,
-               ).as_json,
-             total_count: actions.count,
-           }
-  rescue ActiveRecord::RecordNotFound
-    render json: { error: "Post not found" }, status: :not_found
+    render json: { users: serialize_data(users, BasicUserSerializer), total_count: total_count }
   end
 
   private
 
-  def service_params
-    { params: params.to_unsafe_h, guardian: guardian }
+  def daily_rate_limiter
+    @daily_rate_limiter ||=
+      RateLimiter.new(current_user, "actionable", SiteSetting.actionable_max_per_day, 1.day)
   end
 
-  def ensure_actionable_enabled
-    raise Discourse::NotFound unless SiteSetting.actionable_enabled
+  # Raises RateLimiter::LimitExceeded (rendered as a 429 with the wait time)
+  # without consuming a slot; the slot is recorded only on success.
+  def ensure_daily_limit_not_reached
+    if SiteSetting.actionable_max_per_day <= 0
+      # A limit of 0 turns marking off for everyone except staff.
+      render_error(:not_allowed, status: :forbidden) if !current_user.staff?
+      return
+    end
+
+    daily_rate_limiter.performed! if !daily_rate_limiter.can_perform?
+  end
+
+  def render_toggle_result(post)
+    post.reload
+    serializer = PostSerializer.new(post, scope: guardian, root: false)
+    actioned = serializer.actioned
+
+    # `acted` is kept for clients written against earlier versions.
+    payload = {
+      success: true,
+      actionable_count: post.actionable_count,
+      acted: actioned,
+      actioned: actioned,
+      can_toggle_actionable: serializer.can_toggle_actionable,
+      can_undo_actionable: serializer.can_undo_actionable,
+    }
+
+    render json: payload
+  end
+
+  def render_error(key, status:)
+    render_errors([I18n.t("actionable.errors.#{key}")], status: status)
+  end
+
+  def render_errors(messages, status:)
+    render json: { success: false, errors: messages }, status: status
   end
 end
