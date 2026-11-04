@@ -11,8 +11,8 @@ export default class ActionableSummarySections extends Component {
     {{#if this.siteSettings.actionable_enabled}}
       <div class="top-section most-actionabled-section">
         <UserSummarySection
-          @title="most_actionabled_by"
           class="summary-user-list actionabled-by-section pull-left"
+          @title="most_actionabled_by"
         >
           <UserSummaryUsersList
             @none="no_actionables"
@@ -20,16 +20,16 @@ export default class ActionableSummarySections extends Component {
             as |user|
           >
             <UserSummaryUser
-              @user={{user}}
-              @icon="bullseye"
               @countClass="actionables"
+              @icon="bullseye"
+              @user={{user}}
             />
           </UserSummaryUsersList>
         </UserSummarySection>
 
         <UserSummarySection
-          @title="most_actionabled_users"
           class="summary-user-list actionabled-section pull-right"
+          @title="most_actionabled_users"
         >
           <UserSummaryUsersList
             @none="no_actionables"
@@ -37,9 +37,9 @@ export default class ActionableSummarySections extends Component {
             as |user|
           >
             <UserSummaryUser
-              @user={{user}}
-              @icon="bullseye"
               @countClass="actionables"
+              @icon="bullseye"
+              @user={{user}}
             />
           </UserSummaryUsersList>
         </UserSummarySection>

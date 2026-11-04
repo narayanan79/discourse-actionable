@@ -1,7 +1,7 @@
 import Component from "@glimmer/component";
 import { LinkTo } from "@ember/routing";
 import { service } from "@ember/service";
-import UserStat from "discourse/components/user-stat";
+import DUserStat from "discourse/ui-kit/d-user-stat";
 
 export default class ActionableStats extends Component {
   @service siteSettings;
@@ -11,27 +11,27 @@ export default class ActionableStats extends Component {
       {{#if @outletArgs.model.can_see_user_actions}}
         <li class="stats-actionable-given linked-stat">
           <LinkTo @route="userActivity.actionableGiven">
-            <UserStat
-              @value={{@outletArgs.model.actionable_given}}
+            <DUserStat
               @icon="bullseye"
               @label="user.summary.actionable_given"
+              @value={{@outletArgs.model.actionable_given}}
             />
           </LinkTo>
         </li>
       {{else}}
         <li class="stats-actionable-given">
-          <UserStat
-            @value={{@outletArgs.model.actionable_given}}
+          <DUserStat
             @icon="bullseye"
             @label="user.summary.actionable_given"
+            @value={{@outletArgs.model.actionable_given}}
           />
         </li>
       {{/if}}
       <li class="stats-actionable-received">
-        <UserStat
-          @value={{@outletArgs.model.actionable_received}}
+        <DUserStat
           @icon="bullseye"
           @label="user.summary.actionable_received"
+          @value={{@outletArgs.model.actionable_received}}
         />
       </li>
     {{/if}}

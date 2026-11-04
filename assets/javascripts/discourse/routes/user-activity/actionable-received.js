@@ -1,4 +1,4 @@
-import { htmlSafe } from "@ember/template";
+import { trustHTML } from "@ember/template";
 import { iconHTML } from "discourse/lib/icon-library";
 import UserActivityStreamRoute from "discourse/routes/user-activity-stream";
 import { i18n } from "discourse-i18n";
@@ -14,7 +14,7 @@ export default class UserActivityActionableReceived extends UserActivityStreamRo
       : i18n("user_activity.no_actionable_received_title_others", {
           username: user.username,
         });
-    const body = htmlSafe(
+    const body = trustHTML(
       i18n("user_activity.no_actionable_received_body", {
         icon: iconHTML("bullseye"),
       })
