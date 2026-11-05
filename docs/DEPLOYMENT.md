@@ -46,7 +46,7 @@ These matter to operators:
 | Daily limit | consumed by every attempt that passed the permission check | consumed only by successful marks |
 | `actionable_daily` | grew forever | rows older than 90 days removed daily |
 | Error messages | hard-coded English | translatable (`config/locales/server.en.yml`) |
-| Summary stats after a mark | stale for up to one hour (invalidation was a no-op) | fresh for the owner and anonymous viewers |
+| Summary stats after a mark | stale for up to one hour (invalidation was a no-op) | fresh for every viewer |
 
 ## Rollback
 

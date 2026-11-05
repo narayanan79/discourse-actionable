@@ -37,10 +37,9 @@ against Discourse core `latest` at `61fbb13`. Details are in `TESTING.md`.
 | Behaviour on real site data and traffic (CI uses fabricated data) | Medium | Staging smoke test; watch the metrics under "Monitoring" after release |
 | Hard-coded IDs 50/18/19 may collide with another third-party plugin | Low | Audit installed plugins; changing the IDs needs a data migration |
 | `user_stats.actionable_*` drift after user deletion | Low | Periodic or post-incident `rake actionable:recalculate_stats` |
-| Per-viewer summary cache staleness (≤ 1 h for viewers other than the owner and anonymous) | Low | Same behaviour as core's like counts |
 | Full index on `posts.actionable_count` (write cost on the hottest table) | Low | Consider replacing with a partial index (`WHERE actionable_count > 0`) after checking report usage |
 | Daily limit can be exceeded by parallel requests on different posts (check before, record after success) | Low | Overshoot is at most the number of concurrent requests |
-| `like_created` clears summary caches slightly before core updates like stats; a summary request in that window caches the old like count for up to an hour | Very low | Same staleness as core without the plugin |
+| `like_created` bumps the summary version slightly before core updates like stats; a summary request in that window caches the old like count for up to an hour | Very low | Same staleness as core without the plugin |
 
 ## Operational requirements
 
@@ -67,10 +66,8 @@ From code analysis, not load-tested:
   writes). Requests for the *same* post are serialized. Different posts proceed
   in parallel. A very hot post (many users marking within the same seconds)
   queues briefly on its lock.
-- **Summary cache invalidation:** one Redis `DEL` with
-  `2 users × 2 viewers × locales × 2` keys per mark and per like (392 keys with
-  core's 49 locales). It is a single round trip, but it runs on every like in
-  the forum.
+- **Summary cache invalidation:** two small Redis writes (`INCR`, `EXPIRE`) per
+  user per mark and per like, and one `GET` per summary request.
 - **Directory refresh:** cost now scales with the number of actionable
   `user_actions` in the period, not with the whole table.
 - **`actionable_daily`:** bounded to about 90 days × active markers.

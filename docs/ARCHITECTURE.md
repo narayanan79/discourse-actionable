@@ -16,7 +16,7 @@ and `ENGINEERING_FINDINGS.md`.
 | User stats | `lib/user_action_extension.rb` | `UserAction.update_like_count` maps types 18/19 to `user_stats.actionable_*`. All other types are delegated to core. |
 | User summary | `lib/user_summary_extension.rb` + `plugin.rb` | Lists are serialized with core's `UserWithCountSerializer`. |
 | Directory | `lib/directory_columns.rb` | Per-column refresh SQL, plus the plugin-toggle sync. |
-| Summary cache | `lib/actionable_cache_helper.rb` | Deletes core's summary cache keys (format copied from `UsersController#summary_cache_key`). |
+| Summary cache | `lib/actionable_cache_helper.rb`, `lib/users_controller_extension.rb` | A per-user version in Redis, added to core's per-viewer summary cache key and bumped on every mark, unmark and like. |
 | Daily table | `lib/actionable_daily.rb`, `app/jobs/scheduled/cleanup_actionable_daily.rb` | Reporting data with 90-day retention. |
 | Guards on core APIs | `lib/post_actions_controller_extension.rb`, `lib/post_action_users_controller_extension.rb` | Core's `/post_actions` and `/post_action_users` reject type 50. |
 | Frontend | `assets/javascripts/discourse/` | One initializer, one button component, three connectors, two activity routes. |
@@ -113,8 +113,8 @@ results match an independent reference query on every row.
 
 ## Known limits of the design
 
-- User-summary caches are per viewer. The plugin clears the owner's and the
-  anonymous variants; other viewers see the regular one-hour expiry.
+- User-summary caches are per viewer and cannot be listed, so the plugin
+  changes the key instead: a version bump makes every viewer's copy miss.
 - When a user is deleted, core removes their `post_actions` and `user_actions`
   but does not run the plugin's recount, so affected counters can drift.
   `rake actionable:recalculate_stats` repairs them.
