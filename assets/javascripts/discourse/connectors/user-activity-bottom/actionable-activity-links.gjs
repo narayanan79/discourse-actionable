@@ -1,7 +1,7 @@
 import Component from "@glimmer/component";
-import DNavigationItem from "discourse/components/d-navigation-item";
 import { service } from "@ember/service";
-import icon from "discourse/helpers/d-icon";
+import DNavigationItem from "discourse/ui-kit/d-navigation-item";
+import dIcon from "discourse/ui-kit/helpers/d-icon";
 import { i18n } from "discourse-i18n";
 
 export default class ActionableActivityLinks extends Component {
@@ -10,19 +10,19 @@ export default class ActionableActivityLinks extends Component {
   <template>
     {{#if this.siteSettings.actionable_enabled}}
       <DNavigationItem
-        @route="userActivity.actionableGiven"
-        @ariaCurrentContext="subNav"
         class="user-nav__activity-actionable-given"
+        @ariaCurrentContext="subNav"
+        @route="userActivity.actionableGiven"
       >
-        {{icon "bullseye"}}
+        {{dIcon "bullseye"}}
         <span>{{i18n "user_action_groups.18"}}</span>
       </DNavigationItem>
       <DNavigationItem
-        @route="userActivity.actionableReceived"
-        @ariaCurrentContext="subNav"
         class="user-nav__activity-actionable-received"
+        @ariaCurrentContext="subNav"
+        @route="userActivity.actionableReceived"
       >
-        {{icon "bullseye"}}
+        {{dIcon "bullseye"}}
         <span>{{i18n "user_action_groups.19"}}</span>
       </DNavigationItem>
     {{/if}}

@@ -1,184 +1,115 @@
-# Discourse Actionable Plugin
+# Discourse Actionable
 
-A Discourse plugin that adds an "actionable" button next to the like button, allowing users to mark posts as requiring action.
+A Discourse plugin that adds an **Actionable** button next to the like button,
+so members can mark someone else's post as "requiring action".
 
-## Features
+- Shows how many people marked a post, and who (optional).
+- Updates in real time for everyone viewing the topic.
+- Tracks "Actionable Given / Received" per user: profile stats, summary lists,
+  activity tabs, and optional user-directory columns.
 
-- **Actionable Button**: Check-style button with three states:
-  - Outline check square (not actioned)  
-  - Solid check square (actioned)
-  - Colored solid when user has actioned
-- **Count Display**: Shows number of users who marked the post as actionable
-- **Who Actioned**: Click count to see avatars of users who marked as actionable
-- **Real-time Updates**: Live updates via MessageBus when others act
-- **Rate Limiting**: Configurable daily limits per user
-- **Trust Level Control**: Minimum trust level requirements
-- **Mobile Responsive**: Works on all screen sizes
-- **Accessibility**: Full keyboard navigation and screen reader support
+## Requirements
+
+- Discourse **2026.5.0 or newer**. Older sites are pinned by
+  `.discourse-compatibility` to the last commit that supported them.
+- No extra services: the plugin uses Discourse's own PostgreSQL, Redis and
+  Sidekiq.
 
 ## Installation
 
-1. Clone this repository into your Discourse plugins directory:
-   ```bash
-   cd plugins
-   git clone https://github.com/discourse/discourse-actionable.git
-   ```
+Add the plugin to your container definition (`containers/app.yml`) and rebuild:
 
-2. Rebuild Discourse:
-   ```bash
-   ./launcher rebuild app
-   ```
+```yaml
+hooks:
+  after_code:
+    - exec:
+        cd: $home/plugins
+        cmd:
+          - git clone https://github.com/narayanan79/discourse-actionable.git
+```
+
+```bash
+./launcher rebuild app
+```
+
+The rebuild runs the plugin's migrations and seed data. See
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for upgrade notes, the post-deploy
+migration, and the maintenance tasks.
 
 ## Configuration
 
-The plugin adds several site settings under Admin > Settings > Plugins:
+Admin → Settings → Plugins:
 
-- **actionable_enabled**: Enable/disable the actionable feature (default: true)
-- **actionable_max_per_day**: Maximum actionable actions per user per day (default: 50)
-- **actionable_min_trust_level**: Minimum trust level to use actionable (default: 0)
-- **actionable_show_who_actioned**: Show who marked posts as actionable (default: true)
+| Setting | Default | Description |
+| --- | --- | --- |
+| `actionable_enabled` | `true` | Turns the feature on or off. Turning it off also hides the plugin's directory columns. |
+| `actionable_max_per_day` | `50` | Successful marks allowed per user per day (staff are not limited). `0` blocks marking. |
+| `actionable_min_trust_level` | `0` | Minimum trust level (0–4) needed to mark posts. |
+| `actionable_show_who_actioned` | `true` | Signed-in users can see who marked a post. |
 
-## Architecture
+**Directory columns:** core creates plugin directory columns hidden. To show
+"Actionable Given" and "Actionable Received", go to Admin → Users → Directory
+columns. Turning the plugin off hides them, and turning it back on shows them again.
 
-### Backend Components
+## Behaviour
 
-- **ActionableActionCreator**: Service object for creating actionable actions
-  - Uses Discourse's Service::Base framework
-  - Handles permissions, rate limiting, and validations
-  - Event-driven architecture (triggers :post_action_created events)
-- **ActionableActionDestroyer**: Service object for removing actionable actions
-  - Validates user permissions before removal
-  - Maintains data consistency through event listeners
-- **ActionableDaily**: Model for tracking daily action limits
-  - Prevents abuse through per-user daily quotas
-  - Automatic cleanup of old records
-- **ActionableController**: API endpoints for actionable operations
-  - RESTful design with proper error handling
-  - Uses Guardian for authorization
-- **Post Action Type**: New post action type (ID: 50) for actionable
-  - Integrated with Discourse's existing post action system
+- Members can't mark their own posts, or posts in topics that are closed, archived,
+  deleted, or that they cannot see.
+- A mark can be removed within core's `post_undo_action_window_mins` (10 minutes
+  by default), like a like.
+- Marks in private messages appear on the post but are not counted in profile stats
+  or directory columns. This matches how core treats likes.
+- Anonymous visitors who click the button are sent to the login page.
+- Core's generic `/post_actions` and `/post_action_users` endpoints refuse this
+  action type, so every mark and every "who marked" lookup goes through the
+  plugin's rules.
+- With `actionable_show_who_actioned` off, real-time updates carry only the new
+  count, not who made the change.
 
-### Frontend Components
+## HTTP API
 
-- **ActionableButton**: Main button component with animations
-  - Glimmer component with full JSDoc documentation
-  - Optimistic UI updates for instant feedback
-  - MessageBus integration for real-time updates
-  - Proper loading and disabled states
-- **ActionableCount**: Count display and user list component
-  - Shows actionable count and user avatars
-  - Click-to-expand user list with accessibility support
-- **Post Menu Integration**: Seamless integration with existing post controls
-  - Uses Discourse's post-menu-buttons value transformer
-  - Positioned before reply, share, and flag buttons
-- **Icon System**: Bullseye icon for actionable actions
+All endpoints need a signed-in user and return `404` when the plugin is disabled.
 
-### Database Tables
+| Method | Path | Result |
+| --- | --- | --- |
+| `POST` | `/actionable/:post_id` | `200` with `{ success, actionable_count, actioned, acted, can_toggle_actionable, can_undo_actionable }`. `403` if not allowed, `404` if the post doesn't exist, `422` if already marked, `429` when the daily limit is reached, `503` in read-only mode. |
+| `DELETE` | `/actionable/:post_id` | Same body. `403` after the undo window, `404` if the post wasn't marked. |
+| `GET` | `/actionable/:post_id/who` | `{ users: [...], total_count }`, oldest first, at most 50 users. Users the viewer ignores are hidden. `403` if the post is not visible or the list is disabled. |
 
-- **actionable_daily**: Tracks daily action counts per user
-  - Indexed on user_id and actionable_date for fast queries
-  - Unique constraint prevents duplicate entries
-- **posts.actionable_count**: Denormalized count for performance
-  - Updated via event listeners to avoid N+1 queries
-  - Indexed for efficient sorting and filtering
-- **post_actions**: Uses existing table with actionable post action type
-  - Leverages Discourse's built-in post action infrastructure
-- **user_stats**: Extended with actionable_given and actionable_received columns
-- **directory_items**: Includes actionable statistics for user directory
+The plugin's own errors use `{ success: false, errors: ["…"] }`. The `429`,
+the `503` and the disabled-plugin `404` come from Discourse core in its standard
+error format (`{ errors: [...], error_type: ... }`).
 
-## API Endpoints
+## Events for other plugins
 
-- `POST /actionable/:post_id` - Mark post as actionable
-- `DELETE /actionable/:post_id` - Remove actionable from post  
-- `GET /actionable/:post_id/who` - Get users who actioned the post
+| Event | Arguments |
+| --- | --- |
+| `:actionable_created` | `post_action`, acting `user` |
+| `:actionable_destroyed` | `post_action`, acting `user` |
 
-## Events
+The events fire after the database transaction commits.
 
-The plugin triggers Discourse events that other plugins can listen to:
-
-- `actionable_created` - When a post is marked as actionable
-- `actionable_destroyed` - When actionable is removed from a post
-
-## Styling
-
-The plugin includes comprehensive CSS with support for:
-
-- Dark mode
-- High contrast mode  
-- Mobile responsive design
-- Animation effects
-- Accessibility focus styles
-
-## Code Quality
-
-This plugin follows Discourse best practices and coding standards:
-
-- ✅ **Zero RuboCop offenses** - All Ruby code passes strict linting
-- ✅ **Full JSDoc documentation** - Complete inline documentation for all JavaScript components
-- ✅ **Service-based architecture** - Uses Discourse's Service::Base framework
-- ✅ **Event-driven design** - Single source of truth via event listeners
-- ✅ **Performance optimized** - Denormalized counts, indexed queries, no N+1 issues
-- ✅ **Security hardened** - Guardian integration, rate limiting, input validation
-- ✅ **Accessibility compliant** - ARIA labels, keyboard navigation support
-
-## Testing
-
-Run the plugin tests:
+## Maintenance tasks
 
 ```bash
-bundle exec rspec plugins/discourse-actionable/spec
+./launcher enter app
+rake actionable:recalculate_stats       # repair user_stats / posts counters
+rake actionable:backfill_user_actions   # recreate missing activity rows
 ```
-
-The plugin includes comprehensive test coverage:
-- Service object specs (ActionableActionCreator, ActionableActionDestroyer)
-- Controller specs with error handling
-- Model specs for ActionableDaily
-- System specs for UI interactions
-- Integration tests for real-time updates
-
-## License
-
-MIT License - see LICENSE file for details.
 
 ## Development
 
-### Starting the Development Environment
+See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) and [docs/TESTING.md](docs/TESTING.md).
+Architecture notes are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and the
+security model is in [docs/SECURITY.md](docs/SECURITY.md).
 
-```bash
-# Start Rails server
-RAILS_ENV=development bin/rails server -p 3000 -b 0.0.0.0
+## Companion plugin
 
-# Start Ember server (in another terminal)
-pnpm ember s --proxy http://localhost:3000
-```
+[discourse-insightful](https://github.com/narayanan79/discourse-insightful)
+uses separate identifiers (post action type 51, user actions 20/21), so the two
+plugins can run together.
 
-Access the application at http://localhost:4200
+## License
 
-### Code Style
-
-This plugin follows Discourse coding standards:
-- Run `bundle exec rubocop -A` to auto-fix Ruby linting issues
-- Add JSDoc comments to all JavaScript classes, methods, and getters
-- Follow the service object pattern for business logic
-- Use event listeners in plugin.rb for cross-cutting concerns
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass and code is linted
-6. Submit a pull request
-
-### Pull Request Checklist
-
-- [ ] All RuboCop offenses resolved (`bundle exec rubocop`)
-- [ ] JSDoc comments added for new JavaScript code
-- [ ] Tests added and passing (`bundle exec rspec`)
-- [ ] No console.log or debug statements in production code
-- [ ] README updated if adding new features
-
-## Companion Plugin
-
-This plugin works great alongside the **discourse-insightful** plugin, which allows users to mark posts that provide valuable insights. Together, they provide a comprehensive system for community-driven content curation.
+The project is intended to be MIT-licensed. Note that the repository does not
+yet contain a `LICENSE` file.

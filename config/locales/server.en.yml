@@ -16,3 +16,9 @@ en:
   actionable:
     errors:
       timeout: "The Actionable reaction was created too long ago. It can no longer be modified or removed."
+      post_not_found: "Post not found."
+      not_allowed: "You are not allowed to mark this post as actionable."
+      already_actioned: "You have already marked this post as actionable."
+      not_actioned: "You have not marked this post as actionable."
+      create_failed: "The post could not be marked as actionable. Please try again."
+      destroy_failed: "The actionable mark could not be removed. Please try again."

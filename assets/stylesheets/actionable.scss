@@ -1,31 +1,6 @@
-// User summary stats page - actionable icon color
-.stats-actionable-given,
-.stats-actionable-received {
-  .user-stat .d-icon {
-    color: var(--tertiary) !important;
-  }
-
-  // Higher specificity targeting bullseye icon specifically
-  .user-stat .d-icon-bullseye {
-    color: var(--tertiary) !important;
-  }
-}
-
-// Additional specificity for user summary page
-.user-summary-page {
-  .stats-actionable-given,
-  .stats-actionable-received {
-    .user-stat .d-icon,
-    .user-stat .d-icon-bullseye {
-      color: var(--tertiary) !important;
-    }
-  }
-}
-
-// Actionable button styling with different states
+// Post menu button: outline when not actioned, highlighted when actioned.
 .post-action-menu__actionable-count,
 .post-action-menu__actionable {
-  // Outline state (not actioned) - default clickable state
   &.actionable {
     .d-icon {
       color: var(--primary-medium) !important;
@@ -33,13 +8,13 @@
 
     &:hover {
       background: var(--tertiary-low);
+
       .d-icon {
         color: var(--tertiary);
       }
     }
   }
 
-  // Solid state (actioned by someone else)
   &.has-actionable {
     .d-icon {
       color: var(--primary);
@@ -48,17 +23,14 @@
     .discourse-no-touch & {
       &:hover {
         background: var(--primary-low);
+
         .d-icon {
           color: var(--primary-medium);
-          &[disabled] {
-            color: var(--primary-medium);
-          }
         }
       }
     }
   }
 
-  // Colored solid state (actioned by logged user, within 15 min timeout)
   &.has-actionable.actionable-by-me {
     .d-icon {
       color: var(--tertiary);
@@ -66,16 +38,16 @@
 
     &:hover {
       background: var(--tertiary-low);
+
       .d-icon {
         color: var(--tertiary);
       }
     }
   }
 
-  // Disabled state when button is disabled (timeout expired or no permission)
+  // Disabled (undo window over, or no permission): block interaction only.
   &[disabled] {
     cursor: not-allowed;
-    // Don't change opacity or icon color - just prevent interaction
 
     &:hover {
       background: transparent;
@@ -83,14 +55,15 @@
   }
 }
 
-// Animation for check button
 @keyframes checkBump {
   0% {
     transform: scale(1);
   }
+
   50% {
     transform: scale(1.2);
   }
+
   100% {
     transform: scale(1);
   }
@@ -103,7 +76,14 @@
   }
 }
 
-// Actionable count styling (following like button pattern)
+.post-action-menu__actionable .d-icon-bullseye {
+  width: 1em;
+  height: 1em;
+  vertical-align: middle;
+  fill: currentcolor;
+  transition: fill 0.2s ease-in-out;
+}
+
 .post-action-menu__actionable-count {
   &.my-actionables {
     color: var(--tertiary);
@@ -113,13 +93,8 @@
     color: var(--primary-medium);
   }
 
-  // Disabled state when actionable_show_who_actioned is false
-  &.who-actioned-disabled {
-    cursor: default !important;
-    pointer-events: none;
-    opacity: 1; // Keep it visible, just not clickable
-  }
-
+  // Count shown but the "who actioned" list is unavailable.
+  &.who-actioned-disabled,
   &[disabled] {
     cursor: default !important;
     pointer-events: none;
@@ -127,78 +102,13 @@
   }
 }
 
-// Custom bullseye SVG icon styling
-.post-action-menu__actionable .d-icon-bullseye {
-  // Ensure proper sizing and alignment
-  width: 1em;
-  height: 1em;
-  vertical-align: middle;
-
-  // Ensure the SVG fills properly
-  fill: currentColor;
-
-  // Smooth transitions for color changes
-  transition: fill 0.2s ease-in-out;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-// Enable flexbox on the parent container for ordering
-.user-summary {
-  display: flex;
-  flex-direction: column;
-}
-
-// Summary page styling for actionable sections
-.most-actionabled-section {
-  // Order after Most Liked sections (which have order: 1)
-  order: 2;
-
-  .summary-user-list {
-    .d-icon-bullseye {
-      color: var(--tertiary) !important;
-
-      // Add subtle visual enhancement
-      filter: drop-shadow(0 0 1px var(--tertiary-low));
-
-      // Smooth transitions
-      transition:
-        color 0.2s ease,
-        filter 0.2s ease;
-    }
-  }
-
-  // Hover effects for actionable user items
-  .actionabled-by-section,
-  .actionabled-section {
-    .user-summary-user:hover {
-      .d-icon-bullseye {
-        color: var(--tertiary-high) !important;
-        filter: drop-shadow(0 0 2px var(--tertiary));
-      }
-    }
-  }
-}
-
-// .discourse-reactions-actions:not(.can-toggle-reaction) .discourse-reactions-reaction-button .reaction-button,
-// .discourse-reactions-actions:not(.can-toggle-reaction) .discourse-reactions-reaction-button {
-//     cursor: not-allowed;
-// }
-
 .discourse-actionable-button {
   display: flex;
   align-items: center;
   text-align: center;
   cursor: pointer;
   border-radius: var(--d-post-control-border-radius);
-  position: relative; // For absolute positioning of child elements
+  position: relative;
 
   &:hover {
     background-color: var(--primary-low);
@@ -209,17 +119,16 @@
     font-size: var(--font-up-1);
     color: var(--primary-low-mid);
     display: flex;
-    pointer-events: auto; // Enable pointer events so count can be clicked
+    pointer-events: auto;
     cursor: pointer;
   }
 }
 
-// Container positioning for floating elements
 .double-button {
   position: relative;
 }
 
-// Styling for the who-actioned avatar list (floating popup like who-liked)
+// "Who actioned" avatars, shown as a popup like the "who liked" list.
 .who-actioned {
   position: absolute;
   z-index: 1000;
@@ -270,46 +179,74 @@
   }
 }
 
-// Directory table column header icons for actionable columns
-.directory-table__column-header,
-.table-header-toggle {
-  // Color the bullseye icon in actionable columns
-  .d-icon-bullseye {
+// User summary page: stats, lists and their position.
+.stats-actionable-given,
+.stats-actionable-received {
+  .user-stat .d-icon,
+  .user-stat .d-icon-bullseye {
     color: var(--tertiary) !important;
+  }
+}
 
-    // Add a subtle glow effect for visual emphasis
-    filter: drop-shadow(0 0 2px var(--tertiary-low));
+.user-summary-page {
+  // Lets the actionable lists sit after "Most liked" and before categories
+  // and badges. Scoped to the summary page: other user pages share
+  // `.user-content` and rely on normal block layout.
+  .user-main .user-content {
+    display: flex;
+    flex-direction: column;
   }
 
-  // Hover state for actionable column headers
-  &:hover {
-    .d-icon-bullseye {
-      color: var(--tertiary-hover) !important;
-      filter: drop-shadow(0 0 3px var(--tertiary-low));
+  .top-section.most-actionabled-section {
+    order: 2;
+  }
+
+  .top-section.top-categories-section {
+    order: 4;
+  }
+
+  .top-section.badges-section {
+    order: 5;
+  }
+}
+
+.most-actionabled-section {
+  .summary-user-list .d-icon-bullseye {
+    color: var(--tertiary) !important;
+    filter: drop-shadow(0 0 1px var(--tertiary-low));
+    transition:
+      color 0.2s ease,
+      filter 0.2s ease;
+  }
+
+  .actionabled-by-section,
+  .actionabled-section {
+    .user-summary-user:hover .d-icon-bullseye {
+      color: var(--tertiary-high) !important;
+      filter: drop-shadow(0 0 2px var(--tertiary));
     }
   }
 }
 
-// Alternative selector for more specificity if needed
+// User directory column headers.
+.directory-table__column-header,
+.table-header-toggle {
+  .d-icon-bullseye {
+    color: var(--tertiary) !important;
+    filter: drop-shadow(0 0 2px var(--tertiary-low));
+  }
+
+  &:hover .d-icon-bullseye {
+    color: var(--tertiary-hover) !important;
+    filter: drop-shadow(0 0 3px var(--tertiary-low));
+  }
+}
+
 .users-directory .directory-table .d-icon-bullseye,
 .responsive-table .d-icon-bullseye {
   color: var(--tertiary) !important;
   filter: drop-shadow(0 0 2px var(--tertiary-low));
-
-  // Smooth transitions
   transition:
     color 0.2s ease,
     filter 0.2s ease;
-}
-
-// For positioning the sections on the user profile page
-.user-main .user-content {
-  display: flex;
-  flex-direction: column;
-}
-.top-section.top-categories-section {
-  order: 4
-}
-.top-section.badges-section {
-  order: 5
 }

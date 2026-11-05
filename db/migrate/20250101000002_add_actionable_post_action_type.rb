@@ -1,20 +1,19 @@
 # frozen_string_literal: true
 
 class AddActionablePostActionType < ActiveRecord::Migration[7.0]
+  # Plain SQL so the migration does not depend on application models.
+  # db/fixtures/001_actionable_post_action_type.rb keeps the row up to date.
   def up
-    # Add actionable post action type if it doesn't exist
-    unless PostActionType.where(name_key: 'actionable').exists?
-      PostActionType.create!(
-        id: 50,
-        name_key: 'actionable',
-        is_flag: false,
-        icon: 'bullseye',
-        position: 3
+    execute <<~SQL
+      INSERT INTO post_action_types (id, name_key, is_flag, icon, position, created_at, updated_at)
+      SELECT 50, 'actionable', FALSE, 'bullseye', 3, NOW(), NOW()
+      WHERE NOT EXISTS (
+        SELECT 1 FROM post_action_types WHERE id = 50 OR name_key = 'actionable'
       )
-    end
+    SQL
   end
 
   def down
-    PostActionType.where(name_key: 'actionable').delete_all
+    execute "DELETE FROM post_action_types WHERE name_key = 'actionable'"
   end
 end

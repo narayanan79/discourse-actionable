@@ -1,0 +1,3 @@
+# Releases older than 2026.5.0 lack the `discourse/ui-kit` modules and other APIs
+# this plugin now uses. Those sites keep the last version that supported them.
+< 2026.5.0: ce2c228444c427e07c405165c02c1fae45de201a

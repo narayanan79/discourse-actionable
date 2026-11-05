@@ -1,0 +1,96 @@
+# Testing
+
+Plugin tests run inside a Discourse checkout with plugins loaded.
+
+```bash
+# from the discourse root, with this plugin in plugins/discourse-actionable
+LOAD_PLUGINS=1 bin/rspec plugins/discourse-actionable/spec            # backend + system
+LOAD_PLUGINS=1 bin/rspec plugins/discourse-actionable/spec/requests   # one directory
+bin/rake "plugin:qunit[discourse-actionable]"                         # frontend
+bin/qunit plugins/discourse-actionable/test/javascripts               # frontend (dev server)
+```
+
+CI runs the same suites through `discourse/.github`'s reusable plugin workflow
+(`.github/workflows/discourse-plugin.yml`): linting, RSpec, QUnit, system specs,
+Zeitwerk checks and a `SKIP_DB_AND_REDIS` boot check.
+
+## What is covered
+
+| Area | File | Covers |
+| --- | --- | --- |
+| Mark service | `spec/services/actionable_action_creator_spec.rb` | contract; missing post; own post; anonymous; invisible PM; closed topic; trust level; deleted author; duplicate; core refusal and a failing last write both roll back every earlier write (F-06); stats, user actions, daily count, MessageBus payload, `actioned_by` hidden when the setting is off (F-43), event; PM not counted in stats |
+| Unmark service | `spec/services/actionable_action_destroyer_spec.rb` | contract; missing post/action; undo window; removal; exact stats decrement; PM symmetry (F-07); actions created before user-action logging; MessageBus, event |
+| HTTP | `spec/requests/actionable_controller_spec.rb` | login, plugin disabled (404); response shape; hidden post reveals nothing (F-02); duplicate (422); read-only lock (503); daily limit counts only successes; undo window (403); who-actioned order, real total (F-17), ignored users (F-05), setting, visibility |
+| Core endpoint guards | `spec/requests/post_actions_controller_spec.rb` | `/post_actions` refuses type 50, also when the plugin is disabled (F-01); `/post_action_users` refuses type 50 (F-42); likes unaffected |
+| User summary | `spec/requests/users_controller_spec.rb` | fresh stats for owner and anonymous viewers after a mark (F-13); core user serializer hides names (F-03); lists omitted when empty |
+| Serializer | `spec/serializers/post_serializer_spec.rb` | field values; undo window (F-18); closed topic and own post (F-15); plugin disabled; no per-post lookup in a topic view, with a positive control (F-22) |
+| Directory | `spec/integration/directory_columns_spec.rb` | counts exclude PMs (F-36); columns follow the plugin toggle (F-14); admin choice survives refresh |
+| User deletion | `spec/integration/user_destroyer_spec.rb` | deleting a user who marked posts works; daily rows removed (F-39) |
+| Daily table | `spec/models/actionable_daily_spec.rb`, `spec/jobs/cleanup_actionable_daily_spec.rb` | upsert, decrement by day, floor at zero, retention (F-08, F-12, F-28) |
+| Rake | `spec/tasks/actionable_tasks_spec.rb` | recalculation repairs drift; backfill survives deleted posts (F-10) |
+| UI (browser) | `spec/system/actionable_button_spec.rb`, `spec/system/core_features_spec.rb` | mark/unmark, who list, real-time update, anonymous login; core features still work |
+| Component | `test/javascripts/integration/components/actionable-button-test.gjs` | rendering states, toggle, server errors, disabled state, who list, `shouldRender`, anonymous login |
+| App | `test/javascripts/acceptance/actionable-test.js` | topic page mark, MessageBus updates before and after a toggle (F-16), same user in another tab, who list, anonymous redirect, activity empty states |
+
+## Verification status
+
+### CI (2026-11-05)
+
+The suites ran in CI on draft PR narayanan79/discourse-actionable#1 (head
+`fdd965d`), against Discourse core `latest` at `61fbb13`:
+
+| Check | Result |
+| --- | --- |
+| RSpec (`spec/`, except system) | 81 examples, 0 failures |
+| System specs (`spec/system`) | 23 examples, 0 failures |
+| QUnit (component and acceptance) | 19 tests, 19 passed |
+| ESLint, Stylelint, Prettier, RuboCop, Syntax Tree | pass |
+| Create and migrate the database with the plugin loaded | pass |
+| Zeitwerk eager load and reload, `SKIP_DB_AND_REDIS` boot, English locale lint | pass |
+| `.discourse-compatibility` validation | skipped by the workflow; not checked in CI |
+
+The first CI run found four problems, none of them in plugin behaviour:
+
+- The lockfile lacked the package manager entry that pnpm 12 records, so
+  `pnpm install --frozen-lockfile` failed. That skipped the RuboCop and Syntax
+  Tree steps. The plugin skeleton's lockfile has the same gap.
+- Prettier formatting in one acceptance test.
+- The anonymous summary spec received a 404 from core's
+  `hide_new_user_profiles` (on by default) before reaching the plugin. The
+  example now turns that setting off.
+- RuboCop's `Discourse/Plugins/UseRequireRelative` flagged `load` in the rake
+  task spec. It now uses `Rake.load_rakefile`.
+
+### Before CI (2026-11-04)
+
+The suites above were written while installing Discourse's gem and npm
+dependencies was not permitted (see `BASELINE_REPORT.md` §1). What was
+executed then:
+
+- Ruby 4.0.9 parse check of all 37 Ruby files: no errors or warnings.
+- YAML parsing and i18n key coverage (including the controller's dynamic error keys).
+- JavaScript structural syntax check (10 files) and a template balance check
+  (15 templates). Both checkers have negative controls that fail as expected.
+- PostgreSQL 16, run against a 1M-row dataset:
+  - the directory SQL exactly as generated by `lib/directory_columns.rb`, equal to a reference query on all rows and periods;
+  - the migration 3 data step, with the same result as the original;
+  - concurrent `ActionableDaily.increment_for` upserts;
+  - the index and foreign-key migrations;
+  - the recalculation SQL, which repairs injected drift;
+  - the mark/unmark recount race: two concurrent sessions, without and with the
+    post row lock (F-45).
+- Prism (Ruby's parser) scan for keyword shorthand in calls without parentheses,
+  where Ruby silently takes the next line as the value. It also has negative controls.
+
+CI runs the suites on every pull request and on every push to `main`.
+
+## Writing tests
+
+- Follow core's `.skills/discourse-writing-rspec-tests`. For services:
+  `subject(:result) { described_class.call(params:, **dependencies) }` with the
+  `fail_a_policy` / `run_successfully` matchers.
+- In request specs, do not name a fabricated record `post`. It shadows the
+  `post "/path"` request helper.
+- Use `DiscourseEvent.track_events` and `MessageBus.track_publish` instead of
+  mocking `trigger` or `publish`.
+- Test files end in `-test.js` / `-test.gjs` (enforced by lint).

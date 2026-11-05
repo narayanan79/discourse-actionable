@@ -2,306 +2,144 @@
 
 # name: discourse-actionable
 # about: Adds an actionable button next to the like button, allowing users to mark posts as actionable
-# version: 1.0.0
+# version: 1.1.0
 # authors: narayanan79
 # url: https://github.com/narayanan79/discourse-actionable
-# required_version: 3.5
+# required_version: 2026.5.0
 
 enabled_site_setting :actionable_enabled
 
-# Register stylesheet
 register_asset "stylesheets/actionable.scss"
 
-# Register custom SVG icons
 register_svg_icon "bullseye"
-register_svg_icon "tasks"
-register_svg_icon "inbox"
+
+module ::DiscourseActionable
+  PLUGIN_NAME = "discourse-actionable"
+
+  # Persisted identifiers: changing them requires a data migration.
+  POST_ACTION_TYPE_ID = 50
+  POST_ACTION_TYPE_NAME_KEY = "actionable"
+  USER_ACTION_GIVEN = 18
+  USER_ACTION_RECEIVED = 19
+end
 
 after_initialize do
-  # Require controller
-  require_relative "controllers/actionable_controller.rb"
+  require_relative "lib/actionable_cache_helper"
+  require_relative "lib/actionable_daily"
+  require_relative "lib/directory_columns"
+  require_relative "lib/guardian_extension"
+  require_relative "lib/post_action_users_controller_extension"
+  require_relative "lib/post_actions_controller_extension"
+  require_relative "lib/post_serializer_extension"
+  require_relative "lib/user_action_extension"
+  require_relative "lib/user_summary_extension"
+  require_relative "lib/actionable_action_creator"
+  require_relative "lib/actionable_action_destroyer"
+  require_relative "controllers/actionable_controller"
+  require_relative "app/jobs/scheduled/cleanup_actionable_daily"
 
-  # Add routes
+  register_seedfu_fixtures(File.expand_path("db/fixtures", __dir__))
+
   Discourse::Application.routes.append do
-    post "/actionable/:post_id" => "actionable#create"
-    delete "/actionable/:post_id" => "actionable#destroy"
-    get "/actionable/:post_id/who" => "actionable#who_actioned"
+    constraints(post_id: /\d+/) do
+      post "/actionable/:post_id" => "actionable#create"
+      delete "/actionable/:post_id" => "actionable#destroy"
+      get "/actionable/:post_id/who" => "actionable#who_actioned"
+    end
   end
 
-  require_relative "lib/actionable_cache_helper.rb"
-  require_relative "lib/actionable_daily.rb"
-  require_relative "lib/actionable_action_creator.rb"
-  require_relative "lib/actionable_action_destroyer.rb"
-  require_relative "lib/user_summary_extension.rb"
+  reloadable_patch do
+    ::Guardian.prepend(DiscourseActionable::GuardianExtension)
+    ::PostActionUsersController.prepend(DiscourseActionable::PostActionUsersControllerExtension)
+    ::PostActionsController.prepend(DiscourseActionable::PostActionsControllerExtension)
+    ::PostSerializer.prepend(DiscourseActionable::PostSerializerExtension)
+    ::UserAction.singleton_class.prepend(DiscourseActionable::UserActionExtension)
+    ::UserSummary.prepend(DiscourseActionable::UserSummaryExtension)
 
-  # Extend UserSummary to add actionable stats
-  reloadable_patch { |plugin| ::UserSummary.prepend(DiscourseActionable::UserSummaryExtension) }
-
-  # Add UserAction constants for actionable actions
-  reloadable_patch do |plugin|
+    # Kept for code written against earlier versions of the plugin.
     # rubocop:disable Discourse/Plugins/NamespaceConstants
-    UserAction::ACTIONABLE_GIVEN = 18 unless UserAction.const_defined?(:ACTIONABLE_GIVEN)
-    UserAction::ACTIONABLE_RECEIVED = 19 unless UserAction.const_defined?(:ACTIONABLE_RECEIVED)
+    if !::UserAction.const_defined?(:ACTIONABLE_GIVEN, false)
+      ::UserAction::ACTIONABLE_GIVEN = DiscourseActionable::USER_ACTION_GIVEN
+    end
+    if !::UserAction.const_defined?(:ACTIONABLE_RECEIVED, false)
+      ::UserAction::ACTIONABLE_RECEIVED = DiscourseActionable::USER_ACTION_RECEIVED
+    end
     # rubocop:enable Discourse/Plugins/NamespaceConstants
   end
 
-  # Add post action type for actionable using reloadable_patch
-  reloadable_patch { |plugin| PostActionType.types[:actionable] = 50 }
-
-  # Seed the DB record only on a real boot. During `assets:precompile` Discourse
-  # runs with `GlobalSetting.skip_redis?` true, so `Discourse.cache` is a bare
-  # ActiveSupport::Cache::MemoryStore. Saving a PostActionType fires core's
-  # `after_save { expire_cache }` callback, which (as of 2026.7.0) calls
-  # `Discourse.cache.redis.del(...)` — and MemoryStore has no #redis, so it
-  # raises NoMethodError and aborts the rebuild. The record is created by the
-  # db/migrate migration, so skipping the seed here is safe.
-  unless GlobalSetting.skip_redis?
-    PostActionType.seed do |pat|
-      pat.id = 50
-      pat.name_key = "actionable"
-      pat.is_flag = false
-      pat.icon = "bullseye"
-      pat.position = 3
-    end
-  end
-
-  # Add actionable action summary (following like button pattern)
-  add_to_serializer(:post, :actionable_count) { object.actionable_count || 0 }
-
-  add_to_serializer(:post, :actioned) do
-    return false unless scope.user
-    actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
-    PostAction.exists?(
-      post: object,
-      user: scope.user,
-      post_action_type_id: actionable_type_id,
-      deleted_at: nil,
-    )
-  end
-
-  add_to_serializer(:post, :can_undo_actionable) do
-    return false unless scope.user
-    return false unless SiteSetting.actionable_enabled
-
-    actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
-    PostAction.exists?(
-      post: object,
-      user: scope.user,
-      post_action_type_id: actionable_type_id,
-      deleted_at: nil,
-    )
-  end
-
-  add_to_serializer(:post, :can_toggle_actionable) do
-    return false unless scope.user
-    return false unless SiteSetting.actionable_enabled
-    return false if object.user == scope.user
-    return false if object.trashed?
-    return false if object.topic.archived?
-
-    # Check basic permission first
-    return false if scope.user.trust_level < SiteSetting.actionable_min_trust_level
-
-    # Check if user has already actioned this post
-    actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
-    return false unless actionable_type_id
-
-    existing_action =
-      PostAction.find_by(
-        post: object,
-        user: scope.user,
-        post_action_type_id: actionable_type_id,
-        deleted_at: nil,
-      )
-
-    if existing_action
-      # User has already actioned - check if they can undo (within timeout)
-      scope.can_delete_post_action?(existing_action)
-    else
-      # User hasn't actioned - they can act if they meet basic requirements
-      true
-    end
-  end
-
-  add_to_serializer(:post, :show_actionable) { SiteSetting.actionable_enabled }
-
-  # Track actionable stats
   add_to_class(:post, :update_actionable_count) do
-    actionable_type_id = PostActionType.find_by(name_key: "actionable")&.id
-    count = post_actions.where(post_action_type_id: actionable_type_id, deleted_at: nil).count
+    # Row lock first: a concurrent mark and unmark of this post then count one
+    # after the other, and the later count sees the other's committed change.
+    Post.where(id:).lock.pick(:id)
+    type_id = DiscourseActionable::POST_ACTION_TYPE_ID
+    count = PostAction.where(post_id: id, post_action_type_id: type_id).count
     update_column(:actionable_count, count)
   end
 
-  # Event listeners for actionable actions - only handle MessageBus publishing
-  # User stats and UserAction logging is handled by PostActionCreator and the extension below
-  on(:actionable_created) do |post_action, creator|
-    if post_action && creator
-      post = post_action.post
-      # Publish real-time update using Discourse's standard method
-      post.publish_change_to_clients!(
-        :actioned,
-        { actionable_count: post.actionable_count, actioned_by: creator.id },
-      )
-    end
+  # Post serializer: state for the post menu button.
+  add_to_serializer(:post, :actionable_count) { object.actionable_count.to_i }
+  add_to_serializer(:post, :show_actionable) { SiteSetting.actionable_enabled }
+  add_to_serializer(:post, :actioned) { actionable_post_action.present? }
+
+  add_to_serializer(:post, :can_undo_actionable) do
+    action = actionable_post_action
+    action.present? && scope.can_delete_post_action?(action)
   end
 
-  on(:actionable_destroyed) do |post_action, destroyer|
-    if post_action && destroyer
-      post = post_action.post
-      # Publish real-time update using Discourse's standard method
-      post.publish_change_to_clients!(
-        :unactioned,
-        { actionable_count: post.actionable_count, actioned_by: destroyer.id },
-      )
-    end
+  add_to_serializer(:post, :can_toggle_actionable) do
+    action = actionable_post_action
+    action ? scope.can_delete_post_action?(action) : scope.can_mark_post_actionable?(object)
   end
 
-  # Listen to like events to invalidate user summary cache with locale support
+  # User summary: stats and "most actionabled" lists. The lists use core's
+  # serializer so `enable_names`, flair and staff fields behave like likes.
+  can_see_stats = -> { scope.can_see_summary_stats?(object.user) }
+  has_givers = -> { object.most_actionabled_by_users.present? }
+  has_receivers = -> { object.most_actionabled_users.present? }
+
+  add_to_serializer(:user_summary, :actionable_given, include_condition: can_see_stats) do
+    object.actionable_given
+  end
+
+  add_to_serializer(:user_summary, :actionable_received, include_condition: can_see_stats) do
+    object.actionable_received
+  end
+
+  add_to_serializer(:user_summary, :most_actionabled_by_users, include_condition: has_givers) do
+    serializer = UserSummarySerializer::UserWithCountSerializer
+    users = object.most_actionabled_by_users
+    ActiveModel::ArraySerializer.new(users, each_serializer: serializer, scope:).as_json
+  end
+
+  add_to_serializer(:user_summary, :most_actionabled_users, include_condition: has_receivers) do
+    serializer = UserSummarySerializer::UserWithCountSerializer
+    users = object.most_actionabled_users
+    ActiveModel::ArraySerializer.new(users, each_serializer: serializer, scope:).as_json
+  end
+
+  # Summary pages are cached for an hour per viewer; refresh the ones we can.
   on(:like_created) do |post_action|
-    if post_action
-      ActionableCacheHelper.invalidate_user_summary_cache(post_action.user_id, post_action.post&.user_id)
-    end
+    liked_user_id = post_action.post&.user_id
+    ActionableCacheHelper.invalidate_user_summary_cache(post_action.user_id, liked_user_id)
   end
 
   on(:like_destroyed) do |post_action|
-    if post_action
-      ActionableCacheHelper.invalidate_user_summary_cache(post_action.user_id, post_action.post&.user_id)
-    end
+    liked_user_id = post_action.post&.user_id
+    ActionableCacheHelper.invalidate_user_summary_cache(post_action.user_id, liked_user_id)
   end
 
-  # Extend UserAction.update_like_count to handle actionable stats
-  reloadable_patch do |plugin|
-    module UserActionActionableExtension
-      def update_like_count(user_id, action_type, delta)
-        if action_type == UserAction::LIKE
-          UserStat.where(user_id: user_id).update_all("likes_given = likes_given + #{delta.to_i}")
-        elsif action_type == UserAction::WAS_LIKED
-          UserStat.where(user_id: user_id).update_all(
-            "likes_received = likes_received + #{delta.to_i}",
-          )
-        elsif action_type == UserAction::ACTIONABLE_GIVEN
-          UserStat.where(user_id: user_id).update_all(
-            "actionable_given = actionable_given + #{delta.to_i}",
-          )
-        elsif action_type == UserAction::ACTIONABLE_RECEIVED
-          UserStat.where(user_id: user_id).update_all(
-            "actionable_received = actionable_received + #{delta.to_i}",
-          )
-        else
-          super
-        end
-      end
-    end
+  on(:user_destroyed) { |user| ActionableDaily.where(user_id: user.id).delete_all }
 
-    UserAction.singleton_class.prepend(UserActionActionableExtension)
-  end
+  # User directory columns.
+  columns = DiscourseActionable::DirectoryColumns
+  received_query =
+    columns.query(column: columns::RECEIVED, action_type: DiscourseActionable::USER_ACTION_RECEIVED)
+  given_query =
+    columns.query(column: columns::GIVEN, action_type: DiscourseActionable::USER_ACTION_GIVEN)
 
-  # No global ratelimiter instance; service layer enforces per-user daily limits
+  add_directory_column(columns::RECEIVED, icon: "bullseye", query: received_query)
+  add_directory_column(columns::GIVEN, icon: "bullseye", query: given_query)
 
-  # Automatically enable/disable directory columns based on site setting
-  on(:site_setting_changed) do |setting_name, old_value, new_value|
-    if setting_name == :actionable_enabled
-      DirectoryColumn.where(name: %w[actionable_given actionable_received]).update_all(
-        enabled: new_value,
-      )
-    end
-  end
-
-  # Initialize directory columns enabled state based on current site setting
-  on(:before_directory_refresh) do
-    DirectoryColumn.where(name: %w[actionable_given actionable_received]).update_all(
-      enabled: SiteSetting.actionable_enabled,
-    )
-  end
-
-  # Also sync columns when the plugin loads
-  reloadable_patch do |plugin|
-    Rails.application.config.to_prepare do
-      DirectoryColumn.where(name: %w[actionable_given actionable_received]).update_all(
-        enabled: SiteSetting.actionable_enabled,
-      )
-    end
-  end
-
-  # Add plugin directory columns for actionable stats
-  add_directory_column("actionable_received", icon: "bullseye", query: <<~SQL)
-      WITH actionable_stats AS (
-        SELECT
-          u.id AS user_id,
-          COUNT(CASE WHEN ua.action_type = #{UserAction::ACTIONABLE_RECEIVED} AND ua.created_at > :since THEN 1 END) AS actionable_received_count
-        FROM users u
-        LEFT JOIN user_actions ua ON ua.user_id = u.id AND ua.created_at > :since
-        WHERE u.active AND u.silenced_till IS NULL AND u.id > 0
-        GROUP BY u.id
-      )
-      UPDATE directory_items di
-      SET actionable_received = actionable_stats.actionable_received_count
-      FROM actionable_stats
-      WHERE actionable_stats.user_id = di.user_id
-        AND di.period_type = :period_type
-        AND di.actionable_received <> actionable_stats.actionable_received_count
-    SQL
-
-  add_directory_column("actionable_given", icon: "bullseye", query: <<~SQL)
-      WITH actionable_stats AS (
-        SELECT
-          u.id AS user_id,
-          COUNT(CASE WHEN ua.action_type = #{UserAction::ACTIONABLE_GIVEN} AND ua.created_at > :since THEN 1 END) AS actionable_given_count
-        FROM users u
-        LEFT JOIN user_actions ua ON ua.user_id = u.id AND ua.created_at > :since
-        WHERE u.active AND u.silenced_till IS NULL AND u.id > 0
-        GROUP BY u.id
-      )
-      UPDATE directory_items di
-      SET actionable_given = actionable_stats.actionable_given_count
-      FROM actionable_stats
-      WHERE actionable_stats.user_id = di.user_id
-        AND di.period_type = :period_type
-        AND di.actionable_given <> actionable_stats.actionable_given_count
-    SQL
-
-  # Scheduled job to clean up old daily tracking records
-  # TODO: Convert to proper Job class for Discourse 2026+
-  # NOTE: The `every` API was removed. Need to create app/jobs/scheduled/cleanup_actionable_daily.rb
-  # every :day, at: 0.hours do
-  #   ActionableDaily.cleanup_old_records(90)
-  # end
-
-  # Add user stats to serializers
-  add_to_serializer(:user_summary, :actionable_given) { object.actionable_given }
-  add_to_serializer(:user_summary, :actionable_received) { object.actionable_received }
-
-  # Add user summary section data
-  # Serialize as array of hashes with user data and count
-  add_to_serializer(:user_summary, :most_actionabled_by_users) do
-    object.most_actionabled_by_users.map do |user|
-      {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        avatar_template: User.avatar_template(user.username, user.uploaded_avatar_id),
-        count: user.count,
-      }
-    end
-  end
-
-  add_to_serializer(:user_summary, :most_actionabled_users) do
-    object.most_actionabled_users.map do |user|
-      {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        avatar_template: User.avatar_template(user.username, user.uploaded_avatar_id),
-        count: user.count,
-      }
-    end
-  end
-
-  add_to_serializer(:user_summary, :include_most_actionabled_by_users?) do
-    SiteSetting.actionable_enabled && object.most_actionabled_by_users.present?
-  end
-
-  add_to_serializer(:user_summary, :include_most_actionabled_users?) do
-    SiteSetting.actionable_enabled && object.most_actionabled_users.present?
-  end
+  # Runs when the plugin is switched off too (unlike `on`).
+  on_enabled_change { |_old_value, new_value| columns.set_enabled(new_value) }
 end

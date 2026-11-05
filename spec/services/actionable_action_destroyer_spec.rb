@@ -1,146 +1,120 @@
 # frozen_string_literal: true
-require "rails_helper"
 
-RSpec.describe ActionableActionDestroyer, type: :service do
-  let(:user) { Fabricate(:user) }
-  let(:admin) { Fabricate(:admin) }
-  let(:post) { Fabricate(:post) }
-  let(:guardian) { Guardian.new(user) }
-  let(:admin_guardian) { Guardian.new(admin) }
-
-  before do
-    SiteSetting.actionable_enabled = true
-    # Ensure actionable post action type exists
-    PostActionType.find_or_create_by!(name_key: "actionable") do |pat|
-      pat.is_flag = false
-      pat.icon = "check"
-      pat.position = 50
-    end
+RSpec.describe ActionableActionDestroyer do
+  describe described_class::Contract, type: :model do
+    it { is_expected.to validate_presence_of(:post_id) }
   end
 
-  describe "#call" do
-    context "when user has actioned the post" do
-      let!(:post_action) do
-        ActionableActionCreator.call(guardian: guardian, post: post).post_action
+  describe ".call" do
+    subject(:result) { described_class.call(params:, **dependencies) }
+
+    fab!(:acting_user) { Fabricate(:user, trust_level: TrustLevel[1]) }
+    fab!(:author, :user)
+    fab!(:topic) { Fabricate(:topic, user: author) }
+    fab!(:post) { Fabricate(:post, topic:, user: author) }
+
+    let(:params) { { post_id: post.id } }
+    let(:dependencies) { { guardian: acting_user.guardian } }
+    let(:type_id) { DiscourseActionable::POST_ACTION_TYPE_ID }
+
+    before do
+      enable_current_plugin
+      ActionableActionCreator.call(params: { post_id: post.id }, guardian: acting_user.guardian)
+    end
+
+    context "when contract is invalid" do
+      let(:params) { {} }
+
+      it { is_expected.to fail_a_contract }
+    end
+
+    context "when post is not found" do
+      let(:params) { { post_id: -1 } }
+
+      it { is_expected.to fail_to_find_a_model(:post) }
+    end
+
+    context "when the user has not marked the post" do
+      let(:dependencies) { { guardian: Fabricate(:user).guardian } }
+
+      it { is_expected.to fail_to_find_a_model(:post_action) }
+    end
+
+    context "when the undo window has passed" do
+      before { freeze_time(SiteSetting.post_undo_action_window_mins.minutes.from_now + 1.minute) }
+
+      it { is_expected.to fail_a_policy(:can_remove_post_action) }
+    end
+
+    context "when everything is valid" do
+      let(:messages) { MessageBus.track_publish("/topic/#{topic.id}") { result } }
+      let(:events) { DiscourseEvent.track_events(:actionable_destroyed) { result } }
+
+      it { is_expected.to run_successfully }
+
+      it "removes the post action" do
+        expect { result }.to change {
+          PostAction.where(post:, user: acting_user, post_action_type_id: type_id).count
+        }.from(1).to(0)
       end
 
-      it "destroys the actionable action successfully" do
-        result = ActionableActionDestroyer.call(guardian: guardian, post: post)
-
-        expect(result).to be_success
-        expect(result.post_action).to be_present
-        expect(result.post_action.deleted_at).to be_present
-        expect(result.post_action.user).to eq(user)
-        expect(result.post_action.post).to eq(post)
+      it "updates the post's actionable count" do
+        expect { result }.to change { post.reload.actionable_count }.from(1).to(0)
       end
 
-      it "decrements ActionableDaily counter" do
-        expect { ActionableActionDestroyer.call(guardian: guardian, post: post) }.to change {
-          ActionableDaily.where(user_id: user.id).first&.count
-        }.by(-1)
+      it "removes user actions and decrements stats exactly once" do
+        acting_user.user_stat.update!(actionable_given: 5)
+        author.user_stat.update!(actionable_received: 5)
+
+        result
+
+        expect(UserAction.where(target_post_id: post.id)).to be_empty
+        expect(acting_user.user_stat.reload.actionable_given).to eq(4)
+        expect(author.user_stat.reload.actionable_received).to eq(4)
       end
 
-      it "publishes MessageBus update" do
-        messages =
-          MessageBus.track_publish("/topic/#{post.topic.id}") do
-            ActionableActionDestroyer.call(guardian: guardian, post: post)
-          end
-
-        expect(messages.length).to eq(1)
-        message = messages.first
-        expect(message.data[:type]).to eq("unactioned")
-        expect(message.data[:id]).to eq(post.id)
-        expect(message.data[:actioned_by]).to eq(user.id)
-        expect(message.data[:actionable_count]).to eq(0)
+      it "untracks the daily count" do
+        expect { result }.to change { ActionableDaily.count_for(acting_user.id) }.from(1).to(0)
       end
 
-      it "allows destruction at any time (no timeout, like Like)" do
-        post_action.update!(created_at: 1.year.ago)
-        result = ActionableActionDestroyer.call(guardian: guardian, post: post)
-        expect(result).to be_success
+      it "publishes only the actionable change to the topic channel" do
+        expect(messages.size).to eq(1)
+        expect(messages.first.data).to include(
+          type: :unactioned,
+          id: post.id,
+          actionable_count: 0,
+          actioned_by: acting_user.id,
+        )
+      end
+
+      it "triggers the actionable_destroyed event" do
+        expect(events.size).to eq(1)
+        expect(events.first[:params].last).to eq(acting_user)
       end
     end
 
-    context "when user has not actioned the post" do
-      it "fails to destroy non-existent action" do
-        result = ActionableActionDestroyer.call(guardian: guardian, post: post)
+    context "when the post is in a private message" do
+      fab!(:post) { Fabricate(:private_message_post, user: author, recipient: acting_user) }
 
-        expect(result).to be_failure
+      it "leaves user stats untouched, as they never counted the action" do
+        acting_user.user_stat.update!(actionable_given: 5)
+        author.user_stat.update!(actionable_received: 5)
+
+        expect(result).to run_successfully
+        expect(acting_user.user_stat.reload.actionable_given).to eq(5)
+        expect(author.user_stat.reload.actionable_received).to eq(5)
       end
     end
 
-    context 'when trying to destroy another user\'s action' do
-      let(:other_user) { Fabricate(:user) }
-      let(:other_guardian) { Guardian.new(other_user) }
-
-      before { ActionableActionCreator.call(guardian: other_guardian, post: post) }
-
-      it "fails to destroy action by different user" do
-        result = ActionableActionDestroyer.call(guardian: guardian, post: post)
-
-        expect(result).to be_failure
-      end
-    end
-
-    context "when actionable is disabled" do
-      let!(:post_action) do
-        ActionableActionCreator.call(guardian: guardian, post: post).post_action
+    context "when the action predates user action logging" do
+      before do
+        UserAction.where(target_post_id: post.id).delete_all
+        acting_user.user_stat.update!(actionable_given: 3)
       end
 
-      before { SiteSetting.actionable_enabled = false }
-
-      it "fails to destroy action" do
-        result = ActionableActionDestroyer.call(guardian: guardian, post: post)
-
-        expect(result).to be_failure
-      end
-    end
-
-    context "when user is anonymous" do
-      let(:anonymous_guardian) { Guardian.new(nil) }
-
-      it "fails to destroy action" do
-        result = ActionableActionDestroyer.call(guardian: anonymous_guardian, post: post)
-
-        expect(result).to be_failure
-      end
-    end
-
-    context "when admin destroys user action" do
-      let!(:post_action) do
-        ActionableActionCreator.call(guardian: guardian, post: post).post_action
-      end
-
-      it "allows admin to destroy any actionable action" do
-        result = ActionableActionDestroyer.call(guardian: admin_guardian, post: post)
-
-        expect(result).to be_success
-        expect(result.post_action.deleted_at).to be_present
-      end
-
-      it "publishes correct MessageBus update with original user id" do
-        messages =
-          MessageBus.track_publish("/topic/#{post.topic.id}") do
-            ActionableActionDestroyer.call(guardian: admin_guardian, post: post)
-          end
-
-        expect(messages.length).to eq(1)
-        message = messages.first
-        expect(message.data[:actioned_by]).to eq(user.id) # Original user, not admin
-      end
-    end
-
-    context "when post action is already deleted" do
-      let!(:post_action) do
-        action = ActionableActionCreator.call(guardian: guardian, post: post).post_action
-        action.update!(deleted_at: Time.current)
-        action
-      end
-
-      it "fails to destroy already deleted action" do
-        result = ActionableActionDestroyer.call(guardian: guardian, post: post)
-
-        expect(result).to be_failure
+      it "does not decrement stats for rows that never existed" do
+        expect(result).to run_successfully
+        expect(acting_user.user_stat.reload.actionable_given).to eq(3)
       end
     end
   end
