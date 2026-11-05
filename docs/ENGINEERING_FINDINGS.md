@@ -14,46 +14,47 @@ against Discourse core `2026.11.0-latest` (`b7d63fa`).
 
 - **Fixed:** code changed and checked statically (parse, review against core source).
 - **Fixed (verified: …):** the fix itself was executed in this environment (PostgreSQL, concurrency, key coverage).
-- **Fixed (runtime unverified):** code changed and a regression test written, but the RSpec/QUnit suites could not be executed here (see `BASELINE_REPORT.md` §1).
+- **Fixed (verified: CI …):** the regression test for the finding ran and passed in CI on narayanan79/discourse-actionable#1 (see `TESTING.md`).
+- **Fixed (runtime unverified):** code changed, but no test exercises this behaviour specifically, so a passing CI run does not confirm it.
 - **Deferred:** intentionally not changed, with a reason.
 
 ## Summary
 
 | ID | Category | Severity | Confidence | Title | Status |
 | --- | --- | --- | --- | --- | --- |
-| F-01 | Security / authz | Medium | Confirmed (source) | Core `POST /post_actions` accepts type 50 and bypasses every plugin rule | Fixed (runtime unverified) |
-| F-02 | Security / info leak | Medium | Confirmed (source) | Marking a post you cannot see returns 200 and its actionable count | Fixed (runtime unverified) |
-| F-03 | Privacy | Medium | Confirmed (source) | Summary lists expose real names when `enable_names` is off | Fixed (runtime unverified) |
+| F-01 | Security / authz | Medium | Confirmed (source) | Core `POST /post_actions` accepts type 50 and bypasses every plugin rule | Fixed (verified: CI spec) |
+| F-02 | Security / info leak | Medium | Confirmed (source) | Marking a post you cannot see returns 200 and its actionable count | Fixed (verified: CI spec) |
+| F-03 | Privacy | Medium | Confirmed (source) | Summary lists expose real names when `enable_names` is off | Fixed (verified: CI spec) |
 | F-04 | Privacy | Low | Confirmed (source) | Summary stats ignore the `can_see_summary_stats?` guardian hook | Fixed (runtime unverified) |
-| F-05 | Privacy | Low | Confirmed (source) | Who-actioned list ignores the viewer's ignored users | Fixed (runtime unverified) |
-| F-06 | Data integrity | High | Confirmed (source) | Failures are swallowed: partial writes are reported as success, with no transaction | Fixed (runtime unverified) |
-| F-07 | Data integrity | High | Confirmed (source) | `user_stats` counters drift (unconditional decrement) | Fixed (repair SQL verified; service runtime unverified) |
+| F-05 | Privacy | Low | Confirmed (source) | Who-actioned list ignores the viewer's ignored users | Fixed (verified: CI spec) |
+| F-06 | Data integrity | High | Confirmed (source) | Failures are swallowed: partial writes are reported as success, with no transaction | Fixed (verified: CI spec) |
+| F-07 | Data integrity | High | Confirmed (source) | `user_stats` counters drift (unconditional decrement) | Fixed (verified: repair SQL; CI spec) |
 | F-08 | Data integrity | Medium | Confirmed (source) | `ActionableDaily.increment_for` race: `retry` re-runs `create!` | Fixed (verified: concurrent upsert) |
 | F-09 | Data integrity / ops | Medium | Confirmed (executed) | Migration 3 aborts on legacy blank values and rewrites every `posts` row twice | Fixed (verified: PostgreSQL) |
-| F-10 | Reliability | Medium | Confirmed (source) | Backfill task crashes on trashed posts or deleted authors | Fixed (runtime unverified) |
+| F-10 | Reliability | Medium | Confirmed (source) | Backfill task crashes on trashed posts or deleted authors | Fixed (verified: CI spec) |
 | F-11 | Data integrity | Low | Confirmed (executed) | Duplicate unique index on `actionable_daily` | Fixed (verified: PostgreSQL) |
-| F-12 | Data integrity | Low | Confirmed (source) | Daily counter is decremented on the wrong day | Fixed (runtime unverified) |
-| F-13 | Functional | High | Confirmed (source) | Summary cache invalidation is a no-op (wrong key format) | Fixed (runtime unverified) |
-| F-14 | Functional | Medium | Confirmed (source) | Directory columns: disabling the plugin never hides them; refresh overrides the admin's choice | Fixed (runtime unverified) |
-| F-15 | Functional | Medium | Confirmed (source) | Closed topics: button is enabled but the server always refuses | Fixed (runtime unverified) |
-| F-16 | Functional (UI) | Medium | Confirmed (source) | Stale UI: local overrides mask real-time updates after the first toggle | Fixed (runtime unverified) |
-| F-17 | Functional | Low | Confirmed (source) | Who-actioned `total_count` is capped at 50 and has no ordering | Fixed (runtime unverified) |
-| F-18 | Functional | Low | Confirmed (source) | `can_undo_actionable` ignores the undo window | Fixed (runtime unverified) |
+| F-12 | Data integrity | Low | Confirmed (source) | Daily counter is decremented on the wrong day | Fixed (verified: CI spec) |
+| F-13 | Functional | High | Confirmed (source) | Summary cache invalidation is a no-op (wrong key format) | Fixed (verified: CI spec) |
+| F-14 | Functional | Medium | Confirmed (source) | Directory columns: disabling the plugin never hides them; refresh overrides the admin's choice | Fixed (verified: CI spec) |
+| F-15 | Functional | Medium | Confirmed (source) | Closed topics: button is enabled but the server always refuses | Fixed (verified: CI spec) |
+| F-16 | Functional (UI) | Medium | Confirmed (source) | Stale UI: local overrides mask real-time updates after the first toggle | Fixed (verified: CI QUnit) |
+| F-17 | Functional | Low | Confirmed (source) | Who-actioned `total_count` is capped at 50 and has no ordering | Fixed (verified: CI spec) |
+| F-18 | Functional | Low | Confirmed (source) | `can_undo_actionable` ignores the undo window | Fixed (verified: CI spec) |
 | F-19 | Maintainability | Low | Confirmed (source) | `PostActionType.types[:actionable] = 50` is a no-op | Fixed |
-| F-20 | UX | Low | Confirmed (source) | Anonymous click gives a 403 error dialog instead of the login prompt | Fixed (runtime unverified) |
+| F-20 | UX | Low | Confirmed (source) | Anonymous click gives a 403 error dialog instead of the login prompt | Fixed (verified: CI QUnit and system spec) |
 | F-21 | UX / performance | Low | Confirmed (source) | `console.warn` on every publish, plus one MessageBus subscription per post | Fixed (runtime unverified) |
-| F-22 | Performance | Medium | Confirmed (source) | About 6 extra queries per serialized post (N+1) | Fixed (runtime unverified) |
+| F-22 | Performance | Medium | Confirmed (source) | About 6 extra queries per serialized post (N+1) | Fixed (verified: CI spec) |
 | F-23 | Performance | Medium | Confirmed (executed) | Directory SQL fully scans `user_actions` 12 times per refresh | Fixed (verified: EXPLAIN ANALYZE) |
 | F-24 | i18n | Low | Confirmed (source) | API error messages are hard-coded English | Fixed (verified: key coverage) |
 | F-25 | Performance | Low | Confirmed (source) | Summary list queries run twice per request | Fixed (runtime unverified) |
 | F-26 | Performance | Low | Confirmed (source) | Every toggle also broadcasts topic stats | Fixed (runtime unverified) |
 | F-27 | Reliability | Low | Confirmed (source) | `PostActionType.seed` runs on every process boot | Fixed (runtime unverified) |
-| F-28 | Operations | Medium | Confirmed (source) | `actionable_daily` grows without bound (cleanup disabled) | Fixed (runtime unverified) |
+| F-28 | Operations | Medium | Confirmed (source) | `actionable_daily` grows without bound (cleanup disabled) | Fixed (verified: CI spec) |
 | F-29 | UI | Medium | Confirmed (source) | Global CSS overrides restyle every user page | Fixed (not visually verified) |
-| F-30 | Quality | High | Confirmed (source) | Test suite cannot pass; no CI or linter configuration | Fixed (suites + CI added; not executed) |
+| F-30 | Quality | High | Confirmed (source) | Test suite cannot pass; no CI or linter configuration | Fixed (verified: CI passes) |
 | F-31 | Maintainability | Low | Confirmed (source) | `update_like_count` override duplicates core like logic | Fixed |
 | F-32 | Maintainability | Low | Confirmed (source) | Dead code (icon initializer, `to_prepare`, unused properties/keyframes, duplicate helpers) | Fixed |
-| F-33 | Maintainability | Low | Confirmed (source) | Internal/deprecated front-end APIs and import paths | Fixed (lint not executed) |
+| F-33 | Maintainability | Low | Confirmed (source) | Internal/deprecated front-end APIs and import paths | Fixed (verified: CI lint) |
 | F-34 | Reliability | Low | Confirmed (source) | Migration 2 depends on application model code | Fixed |
 | F-35 | Documentation | Low | Confirmed (source) | README is inaccurate (clone URL, icons, claims, missing LICENSE) | Fixed (LICENSE left to owner) |
 | F-36 | Functional | Low | Confirmed (executed) | Directory counts include PMs and deleted/hidden posts, unlike profile stats | Fixed (verified: PostgreSQL) |
@@ -62,8 +63,8 @@ against Discourse core `2026.11.0-latest` (`b7d63fa`).
 | F-39 | Data integrity / ops | High | Confirmed (executed) | FK `actionable_daily.user_id → users` makes deleting users who marked posts fail | Fixed (verified: PostgreSQL) |
 | F-40 | Data integrity | Low | Confirmed (source) | Deleting a user leaves other users' `actionable_received` and `posts.actionable_count` stale | Deferred (repair task) |
 | F-41 | Functional | Medium | Confirmed (source) | `before_directory_refresh` handler registered as a Symbol never runs (core triggers a String) | Fixed (handler removed) |
-| F-42 | Privacy | Medium | Confirmed (source) | Core `/post_action_users` lists who marked a post to anyone, ignoring `actionable_show_who_actioned` | Fixed (runtime unverified) |
-| F-43 | Privacy | Low | Confirmed (source) | MessageBus payload exposes `actioned_by` to all topic viewers | Fixed (runtime unverified) |
+| F-42 | Privacy | Medium | Confirmed (source) | Core `/post_action_users` lists who marked a post to anyone, ignoring `actionable_show_who_actioned` | Fixed (verified: CI spec) |
+| F-43 | Privacy | Low | Confirmed (source) | MessageBus payload exposes `actioned_by` to all topic viewers | Fixed (verified: CI spec) |
 | F-44 | UI | Low | Confirmed (source) | Who-actioned popup cannot be closed from its own count button (wrong post's button targeted) | Fixed (runtime unverified) |
 | F-45 | Data integrity | Medium | Confirmed (executed) | Concurrent mark + unmark of one post store a wrong `actionable_count` | Fixed (verified: two-session PostgreSQL race) |
 

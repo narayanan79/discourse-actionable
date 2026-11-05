@@ -32,11 +32,40 @@ Zeitwerk checks and a `SKIP_DB_AND_REDIS` boot check.
 | Component | `test/javascripts/integration/components/actionable-button-test.gjs` | rendering states, toggle, server errors, disabled state, who list, `shouldRender`, anonymous login |
 | App | `test/javascripts/acceptance/actionable-test.js` | topic page mark, MessageBus updates before and after a toggle (F-16), same user in another tab, who list, anonymous redirect, activity empty states |
 
-## Verification status (2026-11-04)
+## Verification status
 
-The suites above were **written but not executed** during the remediation.
-Installing Discourse's gem and npm dependencies was not permitted in that
-environment (see `BASELINE_REPORT.md` §1). What *was* executed:
+### CI (2026-11-05)
+
+The suites ran in CI on draft PR narayanan79/discourse-actionable#1 (head
+`fdd965d`), against Discourse core `latest` at `61fbb13`:
+
+| Check | Result |
+| --- | --- |
+| RSpec (`spec/`, except system) | 81 examples, 0 failures |
+| System specs (`spec/system`) | 23 examples, 0 failures |
+| QUnit (component and acceptance) | 19 tests, 19 passed |
+| ESLint, Stylelint, Prettier, RuboCop, Syntax Tree | pass |
+| Create and migrate the database with the plugin loaded | pass |
+| Zeitwerk eager load and reload, `SKIP_DB_AND_REDIS` boot, English locale lint | pass |
+| `.discourse-compatibility` validation | skipped by the workflow; not checked in CI |
+
+The first CI run found four problems, none of them in plugin behaviour:
+
+- The lockfile lacked the package manager entry that pnpm 12 records, so
+  `pnpm install --frozen-lockfile` failed. That skipped the RuboCop and Syntax
+  Tree steps. The plugin skeleton's lockfile has the same gap.
+- Prettier formatting in one acceptance test.
+- The anonymous summary spec received a 404 from core's
+  `hide_new_user_profiles` (on by default) before reaching the plugin. The
+  example now turns that setting off.
+- RuboCop's `Discourse/Plugins/UseRequireRelative` flagged `load` in the rake
+  task spec. It now uses `Rake.load_rakefile`.
+
+### Before CI (2026-11-04)
+
+The suites above were written while installing Discourse's gem and npm
+dependencies was not permitted (see `BASELINE_REPORT.md` §1). What was
+executed then:
 
 - Ruby 4.0.9 parse check of all 37 Ruby files: no errors or warnings.
 - YAML parsing and i18n key coverage (including the controller's dynamic error keys).
@@ -53,7 +82,7 @@ environment (see `BASELINE_REPORT.md` §1). What *was* executed:
 - Prism (Ruby's parser) scan for keyword shorthand in calls without parentheses,
   where Ruby silently takes the next line as the value. It also has negative controls.
 
-Run the suites in CI (or with the commands above) before releasing.
+CI runs the suites on every pull request and on every push to `main`.
 
 ## Writing tests
 

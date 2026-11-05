@@ -1,43 +1,40 @@
 # Production readiness
 
-## Assessment: NOT FULLY ASSESSED
+## Assessment: READY WITH CONDITIONS
 
-The code reviewed and changed here fixes every confirmed Critical, High and
-Medium defect in the register except those explicitly deferred. However, the
-evidence required for a READY or READY WITH CONDITIONS rating does not exist
-yet:
+Every confirmed Critical, High and Medium finding in the register is fixed,
+and the full CI suite passes against current Discourse core. The conditions
+are the checks CI cannot make: a staging smoke test and the upgrade steps.
 
 | Evidence | Status |
 | --- | --- |
-| RSpec (services, requests, serializer, integration, system) | **Not executed.** Installing Discourse's dependencies was not permitted in the remediation environment. |
-| QUnit (component, acceptance) | **Not executed** (same reason). |
-| RuboCop / syntax_tree / ESLint / Prettier / Stylelint | **Not executed.** Code was written to the rule sets (read from `rubocop-discourse` 3.20.0 and `@discourse/lint-configs` 3.8.2), but formatting differences are possible. |
-| Ember build, Zeitwerk and `SKIP_DB_AND_REDIS` boot checks | **Not executed.** |
-| Ruby parse (Ruby 4.0.9), YAML, i18n key coverage, JS structure, template balance | Executed, all passing |
+| RSpec (services, requests, serializer, integration, jobs, tasks) | **Pass in CI:** 81 examples, 0 failures |
+| System specs (browser) | **Pass in CI:** 23 examples, 0 failures |
+| QUnit (component, acceptance) | **Pass in CI:** 19 of 19 |
+| RuboCop, Syntax Tree, ESLint, Prettier, Stylelint | **Pass in CI** |
+| Database create and migrate, Zeitwerk eager load and reload, `SKIP_DB_AND_REDIS` boot | **Pass in CI** |
+| `.discourse-compatibility` validation | Not run (the workflow skipped it); checked by hand against core's parser |
 | All plugin SQL on PostgreSQL 16 (1M-row dataset) | Executed, correct; performance measured |
 | Mark/unmark recount race (two concurrent sessions) | Executed: wrong without the row lock, correct with it |
 | Independent code review against core source | Done; 5 definite and 5 possible issues reported, all verified and addressed or documented |
-| Core API usage | Checked line by line against Discourse `2026.11.0-latest` source |
+| Load test | Not done (see "Scaling characteristics") |
 
-The rating can be raised once the CI workflow added in this change
-(`.github/workflows/discourse-plugin.yml`) passes on a branch.
+CI ran on draft PR narayanan79/discourse-actionable#1 (head `fdd965d`)
+against Discourse core `latest` at `61fbb13`. Details are in `TESTING.md`.
 
-## Path to READY WITH CONDITIONS
+## Conditions
 
-1. Push the changes to a branch and run CI. Fix any lint or formatting
-   differences with `pnpm lint:fix` and `bundle exec stree write`. Investigate
-   any spec failure as a potential defect.
-2. Smoke-test on a staging site running Discourse ≥ 2026.5.0: mark and unmark,
+1. Smoke-test on a staging site running Discourse ≥ 2026.5.0: mark and unmark,
    watch another browser update live, delete a user who has marked posts, toggle
    the plugin, refresh the directory.
-3. Upgrade production, let post-deploy migrations run, then run
+2. Upgrade production, let post-deploy migrations run, then run
    `rake actionable:recalculate_stats`.
 
 ## Remaining risks
 
 | Risk | Severity | Mitigation |
 | --- | --- | --- |
-| Untested code paths (see above) | High until CI passes | Run CI before release |
+| Behaviour on real site data and traffic (CI uses fabricated data) | Medium | Staging smoke test; watch the metrics under "Monitoring" after release |
 | Hard-coded IDs 50/18/19 may collide with another third-party plugin | Low | Audit installed plugins; changing the IDs needs a data migration |
 | `user_stats.actionable_*` drift after user deletion | Low | Periodic or post-incident `rake actionable:recalculate_stats` |
 | Per-viewer summary cache staleness (≤ 1 h for viewers other than the owner and anonymous) | Low | Same behaviour as core's like counts |
@@ -100,10 +97,9 @@ watch `pg_stat_statements` and Redis latency.
 
 ## Recommended next engineering priorities
 
-1. Get CI green (lint formatting, specs, QUnit, system specs).
-2. Decide on and add a LICENSE file.
-3. Replace `index_posts_on_actionable_count` with a partial index (F-37).
-4. Add a Data Explorer or admin report for `actionable_daily`, or drop the table
+1. Decide on and add a LICENSE file.
+2. Replace `index_posts_on_actionable_count` with a partial index (F-37).
+3. Add a Data Explorer or admin report for `actionable_daily`, or drop the table
    if nobody uses it.
-5. Optionally re-sync `user_stats.actionable_*` from directory data during the
+4. Optionally re-sync `user_stats.actionable_*` from directory data during the
    all-time refresh, as core does for likes, to make the counters self-healing.
