@@ -28,6 +28,9 @@ RSpec.describe UsersController do
     end
 
     it "shows up-to-date stats to anonymous visitors right after a post is marked" do
+      # Core hides the profiles of new users without posts from anonymous
+      # visitors (404), and the giver has no posts.
+      SiteSetting.hide_new_user_profiles = false
       expect(summary_for(giver)["actionable_given"]).to eq(0)
 
       mark_target_post

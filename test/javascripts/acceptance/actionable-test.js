@@ -156,12 +156,10 @@ acceptance("Discourse Actionable | activity tabs", function (needs) {
   test("shows an empty state for another user's actionables received", async function (assert) {
     await visit("/u/charlie/activity/actionable-received");
 
-    assert
-      .dom(".empty-state .empty-state__title")
-      .hasText(
-        i18n("user_activity.no_actionable_received_title_others", {
-          username: "charlie",
-        })
-      );
+    assert.dom(".empty-state .empty-state__title").hasText(
+      i18n("user_activity.no_actionable_received_title_others", {
+        username: "charlie",
+      })
+    );
   });
 });
