@@ -11,7 +11,9 @@ RSpec.describe "actionable rake tasks" do
     # Without an engine, the plugin's lib/tasks is only added to the rake
     # command line (Rake.add_rakelib), not to Rails' load_tasks.
     if !Rake::Task.task_defined?("actionable:recalculate_stats")
-      Dir[File.expand_path("../../lib/tasks/*.rake", __dir__)].each { |file| load(file) }
+      Dir[File.expand_path("../../lib/tasks/*.rake", __dir__)].each do |file|
+        Rake.load_rakefile(file)
+      end
     end
     enable_current_plugin
     ActionableActionCreator.call(params: { post_id: target_post.id }, guardian: giver.guardian)
