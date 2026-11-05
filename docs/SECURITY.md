@@ -38,9 +38,8 @@ outbound network calls and stores no secrets.
 - **Visibility oracle:** the endpoints answer 403 for posts that exist but are
   hidden and 404 for posts that do not exist. Core's own post-action endpoints
   behave the same way.
-- **Per-viewer summary cache:** after a change, viewers other than the owner and
-  anonymous users can see stale counts for up to an hour. These are counts only,
-  so no permissions are affected.
+- **Per-viewer summary cache:** each mark, unmark and like bumps a per-user
+  version in the cache key, so every viewer sees the new counts.
 
 ## Reporting a vulnerability
 
